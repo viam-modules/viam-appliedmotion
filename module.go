@@ -8,7 +8,7 @@ import (
 	"go.viam.com/rdk/module"
 	"go.viam.com/utils"
 
-	"thegreatco/viam-appliedmotion/stf10_ip"
+	"thegreatco/viam-appliedmotion/st"
 )
 
 func main() {
@@ -21,7 +21,7 @@ func mainWithArgs(ctx context.Context, args []string, logger golog.Logger) (err 
 		return err
 	}
 
-	err = custom_module.AddModelFromRegistry(ctx, board.API, stf10_ip.Model)
+	err = custom_module.AddModelFromRegistry(ctx, board.API, st.Model)
 	if err != nil {
 		return err
 	}
