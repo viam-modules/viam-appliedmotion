@@ -2,6 +2,8 @@ package st
 
 import (
 	"context"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -99,6 +101,15 @@ func (s *ST) Close(ctx context.Context) error {
 }
 
 func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
+	// FL
+	_, err := s.comm.Send(ctx, fmt.Sprintf("DI%v", positionRevolutions))
+	if err != nil {
+		return err
+	}
+	_, err = s.comm.Send(ctx, "FL")
+	if err != nil {
+		return err
+	}
 	return nil
 }
 func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
@@ -107,16 +118,48 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	// I guess this means run:
 	// 	DI8000
 	// 	FP
+	_, err := s.comm.Send(ctx, fmt.Sprintf("DI%v", positionRevolutions))
+	if err != nil {
+		return err
+	}
+	_, err = s.comm.Send(ctx, "FP")
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
-func (s *ST) IsMoving(context.Context) (bool, error) {
-	return false, nil
+func (s *ST) IsMoving(ctx context.Context) (bool, error) {
+	// SC - 0x0010
+	resp, err := s.comm.Send(ctx, "SC")
+	if err != nil {
+		return false, err
+	}
+	val, err := hex.DecodeString(resp)
+	if err != nil {
+		return false, err
+	}
+	if len(val) > 4 {
+		return false, errors.New("unexpected status length")
+	}
+	return (val[1]>>5)&1 == 1, nil
 }
 
 // IsPowered implements motor.Motor.
 func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool, float64, error) {
-	return false, 0, nil
+	// SC - 0x0010
+	resp, err := s.comm.Send(ctx, "SC")
+	if err != nil {
+		return false, 0, err
+	}
+	val, err := hex.DecodeString(resp)
+	if err != nil {
+		return false, 0, err
+	}
+	if len(val) > 4 {
+		return false, 0, errors.New("unexpected status length")
+	}
+	return (val[1]>>5)&1 == 1, 0, nil
 }
 
 // Position implements motor.Motor.
