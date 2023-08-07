@@ -25,12 +25,14 @@ func newIpComm(ctx context.Context, ipAddress string, timeout time.Duration) (*S
 }
 
 func (s *ST_IP) Send(ctx context.Context, command string) (string, error) {
-	b := make([]byte, 2+len(command))
+	// it is 3 + len(command) because we need the 07 to start and we need to append a carriage return (\r)
+	b := make([]byte, 3+len(command))
 	b[0] = 0
 	b[1] = 7
 	for i, v := range command {
 		b[i+2] = byte(v)
 	}
+	b[len(b)-1] = '\r'
 	nWritten, err := s.socket.Write(b)
 	if err != nil {
 		return "", err
@@ -50,5 +52,10 @@ func (s *ST_IP) Close() error {
 	return s.socket.Close()
 }
 
+// TODO: Need to implement this, I think it's going to depend on how the RS485 interface is exposed to the OS/software
 type ST_RS485 struct {
+}
+
+// TODO: Need to implement this, I think it's going to depend on how the RS485 interface is exposed to the OS/software
+type ST_RS232 struct {
 }

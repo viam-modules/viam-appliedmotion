@@ -26,9 +26,13 @@ type ST struct {
 	activeBackgroundWorkers sync.WaitGroup
 	comm                    SendCloser
 	props                   motor.Properties
-	minRpm                  float32
-	maxRpm                  float32
+	minRpm                  float64
+	maxRpm                  float64
 }
+
+// Investigate:
+// BS - buffer status
+// CE - Communication Error
 
 func init() {
 	resource.RegisterComponent(
@@ -183,14 +187,24 @@ func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 
 // SetPower implements motor.Motor.
 func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
-	// VE?
+	// VE? This is in rev/sec
+	desiredRpm := s.maxRpm * powerPct
+	s.logger.Warn("SetPower called on motor that uses rotational velocity. Scaling %v based on max Rpm %v. Resulting power: %v", powerPct, s.maxRpm, desiredRpm)
+	_, err := s.comm.Send(ctx, fmt.Sprintf("VE%v", desiredRpm))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // Stop implements motor.Motor.
-func (s *ST) Stop(context.Context, map[string]interface{}) error {
+func (s *ST) Stop(ctx context.Context, extras map[string]interface{}) error {
 	// SK - Stop & Kill? Stops and erases queue
 	// SM - Stop Move? Stops and leaves queue intact?
 	// ST - Halts the current buffered command being executed, but does not affect other buffered commands in the command buffer
+	_, err := s.comm.Send(ctx, "SC")
+	if err != nil {
+		return err
+	}
 	return nil
 }

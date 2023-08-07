@@ -9,8 +9,8 @@ type Config struct {
 	Protocol       string             `json:"protocol"`
 	IpAddress      string             `json:"ip_address,omitempty"`
 	ConnectTimeout int64              `json:"connect_timeout"`
-	MinRpm         float32            `json:"min_rpm"`
-	MaxRpm         float32            `json:"max_rpm"`
+	MinRpm         float64            `json:"min_rpm"`
+	MaxRpm         float64            `json:"max_rpm"`
 }
 
 // The rev-pi's config can be found here:
