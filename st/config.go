@@ -7,10 +7,11 @@ import (
 type Config struct {
 	Attributes     utils.AttributeMap `json:"attributes,omitempty"`
 	Protocol       string             `json:"protocol"`
-	IpAddress      string             `json:"ip_address,omitempty"`
+	URI            string             `json:"uri,omitempty"`
 	ConnectTimeout int64              `json:"connect_timeout"`
 	MinRpm         float64            `json:"min_rpm"`
 	MaxRpm         float64            `json:"max_rpm"`
+	StepsPerRev    int64              `json:"steps_per_rev"`
 }
 
 // The rev-pi's config can be found here:

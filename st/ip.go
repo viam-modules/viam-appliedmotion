@@ -5,51 +5,64 @@ import (
 	"errors"
 	"net"
 	"time"
+
+	"github.com/edaniels/golog"
 )
 
-type SendCloser interface {
+type CommPort interface {
+	GetUri() string
 	Send(ctx context.Context, command string) (string, error)
 	Close() error
 }
 
 type ST_IP struct {
+	logger golog.Logger
+	Ctx    context.Context
+	URI    string
 	socket net.Conn
 }
 
-func newIpComm(ctx context.Context, ipAddress string, timeout time.Duration) (*ST_IP, error) {
+func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger golog.Logger) (*ST_IP, error) {
 	d := net.Dialer{
 		Timeout: timeout,
 	}
-	socket, err := d.DialContext(ctx, "udp", ipAddress+":7775")
-	return &ST_IP{socket: socket}, err
+	socket, err := d.DialContext(ctx, "tcp", uri)
+	return &ST_IP{socket: socket, URI: uri, logger: logger}, err
 }
 
 func (s *ST_IP) Send(ctx context.Context, command string) (string, error) {
 	// it is 3 + len(command) because we need the 07 to start and we need to append a carriage return (\r)
-	b := make([]byte, 3+len(command))
-	b[0] = 0
-	b[1] = 7
+	sendBuffer := make([]byte, 3+len(command))
+	sendBuffer[0] = 0
+	sendBuffer[1] = 7
 	for i, v := range command {
-		b[i+2] = byte(v)
+		sendBuffer[i+2] = byte(v)
 	}
-	b[len(b)-1] = '\r'
-	nWritten, err := s.socket.Write(b)
+	sendBuffer[len(sendBuffer)-1] = '\r'
+	s.logger.Debugf("Sending command: %#v", string(sendBuffer))
+	nWritten, err := s.socket.Write(sendBuffer)
 	if err != nil {
 		return "", err
 	}
-	if nWritten != 2+len(command) {
+	if nWritten != 3+len(command) {
 		return "", errors.New("failed to write all bytes")
 	}
-	nRead, err := s.socket.Read(b)
+	readBuffer := make([]byte, 1024)
+	nRead, err := s.socket.Read(readBuffer)
 	if err != nil {
 		return "", err
 	}
-	retString := string(b[:nRead])
+	retString := string(readBuffer[:nRead])
+	s.logger.Debugf("Response: %#v", retString)
 	return retString, nil
 }
 
 func (s *ST_IP) Close() error {
 	return s.socket.Close()
+}
+
+func (s *ST_IP) GetUri() string {
+	return s.URI
 }
 
 // TODO: Need to implement this, I think it's going to depend on how the RS485 interface is exposed to the OS/software
