@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,16 +21,20 @@ var Model = resource.NewModel("appliedmotion", "motor", "st")
 
 type ST struct {
 	resource.Named
-	mu          sync.RWMutex
-	logger      golog.Logger
-	cancelCtx   context.Context
-	cancelFunc  func()
-	comm        CommPort
-	props       motor.Properties
-	minRpm      float64
-	maxRpm      float64
-	stepsPerRev int64
+	mu           sync.RWMutex
+	logger       golog.Logger
+	cancelCtx    context.Context
+	cancelFunc   func()
+	comm         CommPort
+	props        motor.Properties
+	minRpm       float64
+	maxRpm       float64
+	acceleration float64
+	deceleration float64
+	stepsPerRev  int64
 }
+
+var ErrStatusMessageIncorrectLength = errors.New("status message incorrect length")
 
 // Investigate:
 // BS - buffer status
@@ -83,6 +88,9 @@ func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 
 	// Update the steps per rev
 	b.stepsPerRev = newConf.StepsPerRev
+
+	b.acceleration = newConf.Acceleration
+	b.deceleration = newConf.Deceleration
 
 	// Check if the comm object exists at all, if not, create it, this is because we're overloading
 	// this reconfigure method and using it during construction as well.
@@ -142,20 +150,26 @@ func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
 		if val, err := hex.DecodeString(resp); err != nil {
 			return nil, err
 		} else {
-			if len(val) > 4 {
-				return nil, errors.New("unexpected status length")
+			if len(val) > 2 || len(val) < 2 {
+				return nil, ErrStatusMessageIncorrectLength
 			}
 			return val, nil
 		}
 	}
 }
 
-func isMoving(status []byte) bool {
-	return (status[1]>>4)&1 == 1
+func isMoving(status []byte) (bool, error) {
+	if len(status) != 2 {
+		return false, ErrStatusMessageIncorrectLength
+	}
+	return (status[1]>>4)&1 == 1, nil
 }
 
-func inPosition(status []byte) bool {
-	return (status[1]>>3)&1 == 1
+func inPosition(status []byte) (bool, error) {
+	if len(status) != 2 {
+		return false, ErrStatusMessageIncorrectLength
+	}
+	return (status[1]>>3)&1 == 1, nil
 }
 
 func (s *ST) getBufferStatus(ctx context.Context) (int, error) {
@@ -169,7 +183,11 @@ func (s *ST) getBufferStatus(ctx context.Context) (int, error) {
 		}
 		endIndex := strings.Index(resp, "{")
 		if endIndex == -1 {
-			endIndex = startIndex + 5
+			endIndex = startIndex + 3
+		}
+
+		if endIndex > len(resp) {
+			return 0, fmt.Errorf("unexpected response length %v", resp)
 		}
 
 		resp = resp[startIndex+1 : endIndex]
@@ -182,16 +200,16 @@ func (s *ST) waitForMoveCommandToComplete(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return errors.New("context cancelled")
-		default:
-			if bufferIsEmpty, err := s.isBufferEmpty(ctx); err != nil {
+		case <-time.After(100 * time.Millisecond):
+		}
+		if bufferIsEmpty, err := s.isBufferEmpty(ctx); err != nil {
+			return err
+		} else {
+			if isMoving, err := s.IsMoving(ctx); err != nil {
 				return err
 			} else {
-				if isMoving, err := s.IsMoving(ctx); err != nil {
-					return err
-				} else {
-					if bufferIsEmpty && !isMoving {
-						return nil
-					}
+				if bufferIsEmpty && !isMoving {
+					return nil
 				}
 			}
 		}
@@ -212,15 +230,11 @@ func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 
 	// need to convert from revs to steps
 	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
-
-	// First set the desired position
-	if _, err := s.comm.Send(ctx, fmt.Sprintf("DI%v", positionSteps)); err != nil {
-		return err
-	}
+	// need to convert from RPM to revs per second
 	revSec := rpm / 60
-	if _, err := s.comm.Send(ctx, fmt.Sprintf("VE%v", revSec)); err != nil {
-		return err
-	}
+
+	// Now send the configuration commands to setup the motor for the move
+	s.configureMove(ctx, positionSteps, revSec)
 
 	// Then actually execute the move
 	if _, err := s.comm.Send(ctx, "FL"); err != nil {
@@ -239,17 +253,10 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 
 	// need to convert from revs to steps
 	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
-
-	// Set the distance first
-	if _, err := s.comm.Send(ctx, fmt.Sprintf("DI%v", positionSteps)); err != nil {
-		return err
-	}
-
-	// Now set the velocity
+	// need to convert from RPM to revs per second
 	revSec := rpm / 60
-	if _, err := s.comm.Send(ctx, fmt.Sprintf("VE%v", revSec)); err != nil {
-		return err
-	}
+	// Now send the configuration commands to setup the motor for the move
+	s.configureMove(ctx, positionSteps, revSec)
 
 	// Now execute the move command
 	if _, err := s.comm.Send(ctx, "FP"); err != nil {
@@ -260,21 +267,74 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	return s.waitForMoveCommandToComplete(ctx)
 }
 
+func (s *ST) configureMove(ctx context.Context, positionSteps int64, revSec float64) error {
+	// Set the distance first
+	if _, err := s.comm.Send(ctx, fmt.Sprintf("DI%d", positionSteps)); err != nil {
+		return err
+	}
+
+	// Now set the velocity
+	if _, err := s.comm.Send(ctx, fmt.Sprintf("VE%.4f", revSec)); err != nil {
+		return err
+	}
+
+	// Set the acceleration, if we have it
+	if s.acceleration > 0 {
+		if _, err := s.comm.Send(ctx, fmt.Sprintf("AC%.3f", s.acceleration)); err != nil {
+			return err
+		}
+	}
+	// Set the deceleration, if we have it
+	if s.deceleration > 0 {
+		if _, err := s.comm.Send(ctx, fmt.Sprintf("DE%.3f", s.deceleration)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *ST) IsMoving(ctx context.Context) (bool, error) {
 	status, err := s.getStatus(ctx)
-	return isMoving(status), err
+	if err != nil {
+		return false, err
+	}
+	isMoving, err := isMoving(status)
+	return isMoving, err
 }
 
 // IsPowered implements motor.Motor.
 func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool, float64, error) {
 	status, err := s.getStatus(ctx)
-	return isMoving(status), 0, err
+	if err != nil {
+		return false, 0, err
+	}
+	isMoving, err := isMoving(status)
+	return isMoving, 0, err
 }
 
 // Position implements motor.Motor.
 func (s *ST) Position(ctx context.Context, extra map[string]interface{}) (float64, error) {
 	// EP?
-	return 0, nil
+	// IP?
+	// The response should look something like IP=<num>\r
+	if resp, err := s.comm.Send(ctx, "IP"); err != nil {
+		return 0, err
+	} else {
+		startIndex := strings.Index(resp, "=")
+		if startIndex == -1 {
+			return 0, fmt.Errorf("unexpected response %v", resp)
+		}
+		endIndex := strings.Index(resp, "\r")
+		if endIndex == -1 {
+			return 0, fmt.Errorf("unexpected response %v", resp)
+		}
+		resp = resp[startIndex+1 : endIndex]
+		if val, err := strconv.ParseUint(resp, 16, 32); err != nil {
+			return 0, err
+		} else {
+			return float64(val), nil
+		}
+	}
 }
 
 // Properties implements motor.Motor.
@@ -287,18 +347,39 @@ func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 	// EP0?
 	// SP0?
 	// The docs seem to indicate that for proper reset to 0, you must send both EP0 and SP0
+
+	// First reset the encoder
+	if _, err := s.comm.Send(ctx, "EP0"); err != nil {
+		return err
+	}
+
+	// Then reset the internal position
+	if _, err := s.comm.Send(ctx, "SP0"); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 // SetPower implements motor.Motor.
 func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
+	return errors.New("set power is not supported for this motor")
 	// VE? This is in rev/sec
 	desiredRpm := s.maxRpm * powerPct
 	s.logger.Warn("SetPower called on motor that uses rotational velocity. Scaling %v based on max Rpm %v. Resulting power: %v", powerPct, s.maxRpm, desiredRpm)
-	_, err := s.comm.Send(ctx, fmt.Sprintf("VE%v", desiredRpm))
-	if err != nil {
+
+	// need to convert from revs to steps
+	positionSteps := int64(math.MaxInt32)
+	// need to convert from RPM to revs per second
+	revSec := desiredRpm / 60
+	// Now send the configuration commands to setup the motor for the move
+	s.configureMove(ctx, positionSteps, revSec)
+
+	// Now execute the move command
+	if _, err := s.comm.Send(ctx, "FP"); err != nil {
 		return err
 	}
+	// We explicitly don't want to wait for the command to finish
 	return nil
 }
 
@@ -312,4 +393,10 @@ func (s *ST) Stop(ctx context.Context, extras map[string]interface{}) error {
 		return err
 	}
 	return nil
+}
+
+func (s *ST) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
+	command := cmd["command"].(string)
+	response, err := s.comm.Send(ctx, command)
+	return map[string]interface{}{"response": response}, err
 }

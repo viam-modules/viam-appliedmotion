@@ -12,6 +12,8 @@ type Config struct {
 	MinRpm         float64            `json:"min_rpm"`
 	MaxRpm         float64            `json:"max_rpm"`
 	StepsPerRev    int64              `json:"steps_per_rev"`
+	Acceleration   float64            `json:"acceleration,omitempty"`
+	Deceleration   float64            `json:"deceleration,omitempty"`
 }
 
 // The rev-pi's config can be found here:

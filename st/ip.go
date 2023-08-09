@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/edaniels/golog"
@@ -16,6 +17,7 @@ type CommPort interface {
 }
 
 type ST_IP struct {
+	mu     sync.RWMutex
 	logger golog.Logger
 	Ctx    context.Context
 	URI    string
@@ -24,13 +26,18 @@ type ST_IP struct {
 
 func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger golog.Logger) (*ST_IP, error) {
 	d := net.Dialer{
-		Timeout: timeout,
+		Timeout:   timeout,
+		KeepAlive: 1 * time.Second,
+		Deadline:  time.Now().Add(timeout),
 	}
 	socket, err := d.DialContext(ctx, "tcp", uri)
-	return &ST_IP{socket: socket, URI: uri, logger: logger}, err
+	return &ST_IP{socket: socket, URI: uri, logger: logger, mu: sync.RWMutex{}}, err
 }
 
 func (s *ST_IP) Send(ctx context.Context, command string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// it is 3 + len(command) because we need the 07 to start and we need to append a carriage return (\r)
 	sendBuffer := make([]byte, 3+len(command))
 	sendBuffer[0] = 0
@@ -54,10 +61,13 @@ func (s *ST_IP) Send(ctx context.Context, command string) (string, error) {
 	}
 	retString := string(readBuffer[:nRead])
 	s.logger.Debugf("Response: %#v", retString)
+	time.Sleep(1 * time.Millisecond)
 	return retString, nil
 }
 
 func (s *ST_IP) Close() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	return s.socket.Close()
 }
 
