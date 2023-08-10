@@ -37,7 +37,6 @@ type ST struct {
 var ErrStatusMessageIncorrectLength = errors.New("status message incorrect length")
 
 // Investigate:
-// BS - buffer status
 // CE - Communication Error
 
 func init() {
@@ -48,7 +47,7 @@ func init() {
 }
 
 func NewMotor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger golog.Logger) (motor.Motor, error) {
-	logger.Info("Starting Applied Motion Products ST-IP Driver v0.1")
+	logger.Info("Starting Applied Motion Products ST Motor Driver v0.1")
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 	b := ST{
@@ -68,6 +67,7 @@ func NewMotor(ctx context.Context, deps resource.Dependencies, conf resource.Con
 func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf resource.Config) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	b.logger.Debug("Reconfiguring Applied Motion Products ST Motor Driver")
 
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
@@ -117,17 +117,24 @@ func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 }
 
 func getComm(ctx context.Context, conf *Config, logger golog.Logger) (CommPort, error) {
-	if strings.ToLower(conf.Protocol) == "ip" {
+	switch {
+	case strings.ToLower(conf.Protocol) == "can":
+		// logger.Debug("Creating CAN Comm Port")
+		return nil, fmt.Errorf("unsupported comm type %s", conf.Protocol)
+		// return newCanComm(ctx, conf.URI, logger)
+	case strings.ToLower(conf.Protocol) == "ip":
+		logger.Debug("Creating IP Comm Port")
 		timeout := time.Duration(conf.ConnectTimeout * int64(time.Second))
 		return newIpComm(ctx, conf.URI, timeout, logger)
+	case strings.ToLower(conf.Protocol) == "rs485":
+		logger.Debug("Creating RS485 Comm Port")
+		return newSerialComm(ctx, conf.URI, logger)
+	case strings.ToLower(conf.Protocol) == "rs232":
+		logger.Debug("Creating RS232 Comm Port")
+		return newSerialComm(ctx, conf.URI, logger)
+	default:
+		return nil, fmt.Errorf("unknown comm type %s", conf.Protocol)
 	}
-	if strings.ToLower(conf.Protocol) == "rs485" {
-		return nil, fmt.Errorf("unsupported comm type %s", conf.Protocol)
-	}
-	if strings.ToLower(conf.Protocol) == "rs232" {
-		return nil, fmt.Errorf("unsupported comm type %s", conf.Protocol)
-	}
-	return nil, fmt.Errorf("unknown comm type %s", conf.Protocol)
 }
 
 func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
@@ -222,12 +229,18 @@ func (s *ST) isBufferEmpty(ctx context.Context) (bool, error) {
 }
 
 func (s *ST) Close(ctx context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.logger.Debug("Closing comm port")
 	return s.comm.Close()
 }
 
 func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// FL
-
+	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
 	// need to convert from revs to steps
 	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
 	// need to convert from RPM to revs per second
@@ -245,12 +258,14 @@ func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 }
 
 func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// FP?
 	// For Ethernet drives, do not use FP with a position parameter. Instead, use DI to set the target position.
 	// I guess this means run:
 	// 	DI8000
 	// 	FP
-
+	s.logger.Debugf("GoTo: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
 	// need to convert from revs to steps
 	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
 	// need to convert from RPM to revs per second
@@ -294,6 +309,9 @@ func (s *ST) configureMove(ctx context.Context, positionSteps int64, revSec floa
 }
 
 func (s *ST) IsMoving(ctx context.Context) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.logger.Debug("IsMoving")
 	status, err := s.getStatus(ctx)
 	if err != nil {
 		return false, err
@@ -304,6 +322,9 @@ func (s *ST) IsMoving(ctx context.Context) (bool, error) {
 
 // IsPowered implements motor.Motor.
 func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool, float64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.logger.Debugf("IsPowered: extra=%v", extra)
 	status, err := s.getStatus(ctx)
 	if err != nil {
 		return false, 0, err
@@ -314,6 +335,9 @@ func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool,
 
 // Position implements motor.Motor.
 func (s *ST) Position(ctx context.Context, extra map[string]interface{}) (float64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.logger.Debugf("Position: extra=%v", extra)
 	// EP?
 	// IP?
 	// The response should look something like IP=<num>\r
@@ -344,10 +368,12 @@ func (s *ST) Properties(ctx context.Context, extra map[string]interface{}) (moto
 
 // ResetZeroPosition implements motor.Motor.
 func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[string]interface{}) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// EP0?
 	// SP0?
 	// The docs seem to indicate that for proper reset to 0, you must send both EP0 and SP0
-
+	s.logger.Debugf("ResetZeroPosition: offset=%v", offset)
 	// First reset the encoder
 	if _, err := s.comm.Send(ctx, "EP0"); err != nil {
 		return err
@@ -363,6 +389,9 @@ func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 
 // SetPower implements motor.Motor.
 func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	return errors.New("set power is not supported for this motor")
 	// VE? This is in rev/sec
 	desiredRpm := s.maxRpm * powerPct
@@ -385,9 +414,12 @@ func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 
 // Stop implements motor.Motor.
 func (s *ST) Stop(ctx context.Context, extras map[string]interface{}) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// SK - Stop & Kill? Stops and erases queue
 	// SM - Stop Move? Stops and leaves queue intact?
 	// ST - Halts the current buffered command being executed, but does not affect other buffered commands in the command buffer
+	s.logger.Debugf("Stop called with %v", extras)
 	_, err := s.comm.Send(ctx, "SC")
 	if err != nil {
 		return err
@@ -396,6 +428,9 @@ func (s *ST) Stop(ctx context.Context, extras map[string]interface{}) error {
 }
 
 func (s *ST) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.logger.Debug("DoCommand called with %v", cmd)
 	command := cmd["command"].(string)
 	response, err := s.comm.Send(ctx, command)
 	return map[string]interface{}{"response": response}, err

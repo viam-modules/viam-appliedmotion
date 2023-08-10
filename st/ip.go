@@ -3,7 +3,10 @@ package st
 import (
 	"context"
 	"errors"
+	"io"
+	"io/fs"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -16,28 +19,36 @@ type CommPort interface {
 	Close() error
 }
 
-type ST_IP struct {
+type st struct {
 	mu     sync.RWMutex
 	logger golog.Logger
 	Ctx    context.Context
 	URI    string
-	socket net.Conn
+	handle io.ReadWriteCloser
 }
 
-func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger golog.Logger) (*ST_IP, error) {
+func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger golog.Logger) (*st, error) {
 	d := net.Dialer{
 		Timeout:   timeout,
 		KeepAlive: 1 * time.Second,
 		Deadline:  time.Now().Add(timeout),
 	}
 	socket, err := d.DialContext(ctx, "tcp", uri)
-	return &ST_IP{socket: socket, URI: uri, logger: logger, mu: sync.RWMutex{}}, err
+	return &st{handle: socket, URI: uri, logger: logger, mu: sync.RWMutex{}}, err
 }
 
-func (s *ST_IP) Send(ctx context.Context, command string) (string, error) {
+func newSerialComm(ctx context.Context, file string, logger golog.Logger) (*st, error) {
+	if fd, err := os.OpenFile(file, os.O_RDWR, fs.FileMode(os.O_RDWR)); err != nil {
+		return nil, err
+	} else {
+		return &st{handle: fd, URI: file, logger: logger, mu: sync.RWMutex{}}, nil
+	}
+}
+
+func (s *st) Send(ctx context.Context, command string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
+	s.logger.Debugf("Sending command: %#v", command)
 	// it is 3 + len(command) because we need the 07 to start and we need to append a carriage return (\r)
 	sendBuffer := make([]byte, 3+len(command))
 	sendBuffer[0] = 0
@@ -46,8 +57,8 @@ func (s *ST_IP) Send(ctx context.Context, command string) (string, error) {
 		sendBuffer[i+2] = byte(v)
 	}
 	sendBuffer[len(sendBuffer)-1] = '\r'
-	s.logger.Debugf("Sending command: %#v", string(sendBuffer))
-	nWritten, err := s.socket.Write(sendBuffer)
+	s.logger.Debugf("Sending buffer: %#v", sendBuffer)
+	nWritten, err := s.handle.Write(sendBuffer)
 	if err != nil {
 		return "", err
 	}
@@ -55,30 +66,23 @@ func (s *ST_IP) Send(ctx context.Context, command string) (string, error) {
 		return "", errors.New("failed to write all bytes")
 	}
 	readBuffer := make([]byte, 1024)
-	nRead, err := s.socket.Read(readBuffer)
+	nRead, err := s.handle.Read(readBuffer)
 	if err != nil {
 		return "", err
 	}
+	// TODO: Check the return value to see if it resulted in an error (and wrap it) or was a success
 	retString := string(readBuffer[:nRead])
 	s.logger.Debugf("Response: %#v", retString)
 	time.Sleep(1 * time.Millisecond)
 	return retString, nil
 }
 
-func (s *ST_IP) Close() error {
+func (s *st) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.socket.Close()
+	return s.handle.Close()
 }
 
-func (s *ST_IP) GetUri() string {
+func (s *st) GetUri() string {
 	return s.URI
-}
-
-// TODO: Need to implement this, I think it's going to depend on how the RS485 interface is exposed to the OS/software
-type ST_RS485 struct {
-}
-
-// TODO: Need to implement this, I think it's going to depend on how the RS485 interface is exposed to the OS/software
-type ST_RS232 struct {
 }
