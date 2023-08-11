@@ -19,7 +19,7 @@ type CommPort interface {
 	Close() error
 }
 
-type st struct {
+type comms struct {
 	mu     sync.RWMutex
 	logger golog.Logger
 	Ctx    context.Context
@@ -27,25 +27,25 @@ type st struct {
 	handle io.ReadWriteCloser
 }
 
-func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger golog.Logger) (*st, error) {
+func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger golog.Logger) (*comms, error) {
 	d := net.Dialer{
 		Timeout:   timeout,
 		KeepAlive: 1 * time.Second,
 		Deadline:  time.Now().Add(timeout),
 	}
 	socket, err := d.DialContext(ctx, "tcp", uri)
-	return &st{handle: socket, URI: uri, logger: logger, mu: sync.RWMutex{}}, err
+	return &comms{handle: socket, URI: uri, logger: logger, mu: sync.RWMutex{}}, err
 }
 
-func newSerialComm(ctx context.Context, file string, logger golog.Logger) (*st, error) {
+func newSerialComm(ctx context.Context, file string, logger golog.Logger) (*comms, error) {
 	if fd, err := os.OpenFile(file, os.O_RDWR, fs.FileMode(os.O_RDWR)); err != nil {
 		return nil, err
 	} else {
-		return &st{handle: fd, URI: file, logger: logger, mu: sync.RWMutex{}}, nil
+		return &comms{handle: fd, URI: file, logger: logger, mu: sync.RWMutex{}}, nil
 	}
 }
 
-func (s *st) Send(ctx context.Context, command string) (string, error) {
+func (s *comms) Send(ctx context.Context, command string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("Sending command: %#v", command)
@@ -77,12 +77,12 @@ func (s *st) Send(ctx context.Context, command string) (string, error) {
 	return retString, nil
 }
 
-func (s *st) Close() error {
+func (s *comms) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.handle.Close()
 }
 
-func (s *st) GetUri() string {
+func (s *comms) GetUri() string {
 	return s.URI
 }

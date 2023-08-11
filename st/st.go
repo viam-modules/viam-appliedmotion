@@ -124,6 +124,10 @@ func getComm(ctx context.Context, conf *Config, logger golog.Logger) (CommPort, 
 		// return newCanComm(ctx, conf.URI, logger)
 	case strings.ToLower(conf.Protocol) == "ip":
 		logger.Debug("Creating IP Comm Port")
+		if conf.ConnectTimeout == 0 {
+			logger.Debug("Setting default connect timeout to 5 seconds")
+			conf.ConnectTimeout = 5
+		}
 		timeout := time.Duration(conf.ConnectTimeout * int64(time.Second))
 		return newIpComm(ctx, conf.URI, timeout, logger)
 	case strings.ToLower(conf.Protocol) == "rs485":
