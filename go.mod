@@ -1,4 +1,4 @@
-module thegreatco/viam-appliedmotion
+module viam-labs/viam-appliedmotion
 
 go 1.19
 

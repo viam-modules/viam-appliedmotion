@@ -8,7 +8,7 @@ import (
 	"go.viam.com/rdk/module"
 	"go.viam.com/utils"
 
-	"thegreatco/viam-appliedmotion/st"
+	"viam-labs/viam-appliedmotion/st"
 )
 
 func main() {

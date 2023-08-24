@@ -28,6 +28,7 @@ type comms struct {
 }
 
 func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger golog.Logger) (*comms, error) {
+	logger.Debugf("Dialing %s", uri)
 	d := net.Dialer{
 		Timeout:   timeout,
 		KeepAlive: 1 * time.Second,
@@ -38,6 +39,7 @@ func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger go
 }
 
 func newSerialComm(ctx context.Context, file string, logger golog.Logger) (*comms, error) {
+	logger.Debugf("Opening %s", file)
 	if fd, err := os.OpenFile(file, os.O_RDWR, fs.FileMode(os.O_RDWR)); err != nil {
 		return nil, err
 	} else {
@@ -78,6 +80,7 @@ func (s *comms) Send(ctx context.Context, command string) (string, error) {
 }
 
 func (s *comms) Close() error {
+	s.logger.Debugf("Closing %s", s.URI)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.handle.Close()

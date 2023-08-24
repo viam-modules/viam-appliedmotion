@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,7 +16,7 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
-var Model = resource.NewModel("appliedmotion", "motor", "st")
+var Model = resource.NewModel("viam-labs", "appliedmotion", "st")
 
 type ST struct {
 	resource.Named
@@ -397,23 +396,25 @@ func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 	defer s.mu.Unlock()
 
 	return errors.New("set power is not supported for this motor")
-	// VE? This is in rev/sec
-	desiredRpm := s.maxRpm * powerPct
-	s.logger.Warn("SetPower called on motor that uses rotational velocity. Scaling %v based on max Rpm %v. Resulting power: %v", powerPct, s.maxRpm, desiredRpm)
+	/*
+		// VE? This is in rev/sec
+		desiredRpm := s.maxRpm * powerPct
+		s.logger.Warn("SetPower called on motor that uses rotational velocity. Scaling %v based on max Rpm %v. Resulting power: %v", powerPct, s.maxRpm, desiredRpm)
 
-	// need to convert from revs to steps
-	positionSteps := int64(math.MaxInt32)
-	// need to convert from RPM to revs per second
-	revSec := desiredRpm / 60
-	// Now send the configuration commands to setup the motor for the move
-	s.configureMove(ctx, positionSteps, revSec)
+		// need to convert from revs to steps
+		positionSteps := int64(math.MaxInt32)
+		// need to convert from RPM to revs per second
+		revSec := desiredRpm / 60
+		// Now send the configuration commands to setup the motor for the move
+		s.configureMove(ctx, positionSteps, revSec)
 
-	// Now execute the move command
-	if _, err := s.comm.Send(ctx, "FP"); err != nil {
-		return err
-	}
-	// We explicitly don't want to wait for the command to finish
-	return nil
+		// Now execute the move command
+		if _, err := s.comm.Send(ctx, "FP"); err != nil {
+			return err
+		}
+		// We explicitly don't want to wait for the command to finish
+		return nil
+	*/
 }
 
 // Stop implements motor.Motor.
