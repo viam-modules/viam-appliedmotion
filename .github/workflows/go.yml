@@ -103,6 +103,6 @@ jobs:
       with:
         module-path: viam-appliedmotion-${{ env.os }}-${{ matrix.arch }}.tar.gz
         namespace: viam-labs
-        platform: ${{ env.os }}/${{ matrix.arch }}
+        platform: ${{ matrix.runner }}/${{ matrix.arch }}
         version: ${{ github.ref_name }}
         cli-config-secret: ${{ secrets.cli_config }}
