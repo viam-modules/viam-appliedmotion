@@ -5,7 +5,7 @@
   "description": "A modular component for Applied Motion Motor Controllers",
   "models": [
     {
-      "api": "rdk:component:board",
+      "api": "rdk:component:motor",
       "model": "viam-labs:appliedmotion:st"
     }
   ],
