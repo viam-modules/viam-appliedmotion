@@ -15,9 +15,13 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
-        architecture: [ amd64, arm64 ]
-    runs-on: ${{ matrix.os }}
+        runner: [ ubuntu-latest, macos-latest ]
+        arch: [ amd64, arm64 ]
+    runs-on: ${{ matrix.runner }}
+    env:
+      os: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'macos' || 'unknown'}}
+      GOOS: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'darwin' || 'unknown'}}
+      GOARCH: ${{ matrix.arch }}
     steps:
     - name: Check out code
       if: github.event_name != 'pull_request_target'
@@ -36,18 +40,15 @@ jobs:
         go-version: '1.20'
 
     - name: Build
-      env:
-        GOOS: ${{ matrix.os }}
-        GOARCH: ${{ matrix.architecture }}
       run: go build -o viam-appliedmotion -v .
 
     - name: Package
-      run: tar -zcf viam-appliedmotion-${{ matrix.os }}-${{ matrix.architecture }}.tar.gz viam-appliedmotion
+      run: tar -zcf viam-appliedmotion-${{ env.os }}-${{ matrix.arch }}.tar.gz viam-appliedmotion
     
     - uses: actions/upload-artifact@v3
       with:
-        name: viam-appliedmotion-${{ matrix.os }}-${{ matrix.architecture }}
-        path: viam-appliedmotion-${{ matrix.os }}-${{ matrix.architecture }}.tar.gz
+        name: viam-appliedmotion-${{ env.os }}-${{ matrix.arch }}
+        path: viam-appliedmotion-${{ env.os }}-${{ matrix.arch }}.tar.gz
 
   # test:
   #   runs-on: ubuntu-latest
@@ -73,10 +74,14 @@ jobs:
   publish:
     strategy:
       matrix:
-        os: [ ubuntu-latest, macos-latest ]
-        architecture: [ amd64, arm64 ]
-    runs-on: ${{ matrix.os }}
+        runner: [ ubuntu-latest, macos-latest ]
+        arch: [ amd64, arm64 ]
+    runs-on: ${{ matrix.runner }}
     needs: [build]
+    env:
+      os: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'macos' || 'unknown'}}
+      GOOS: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'darwin' || 'unknown'}}
+      GOARCH: ${{ matrix.arch }}
     if: github.event_name == 'release'
     steps:
     - name: Check out code
@@ -92,12 +97,12 @@ jobs:
 
     - uses: actions/download-artifact@v3
       with:
-        name: viam-appliedmotion-${{ matrix.os }}-${{ matrix.architecture }}
+        name: viam-appliedmotion-${{ env.os }}-${{ matrix.arch }}
     - name: Upload
       uses: viamrobotics/upload-module@main
       with:
-        module-path: viam-appliedmotion-${{ matrix.os }}-${{ matrix.architecture }}.tar.gz
+        module-path: viam-appliedmotion-${{ env.os }}-${{ matrix.arch }}.tar.gz
         namespace: viam-labs
-        platform: ${{ matrix.os }}/${{ matrix.architecture }}
+        platform: ${{ env.os }}/${{ matrix.arch }}
         version: ${{ github.ref_name }}
         cli-config-secret: ${{ secrets.cli_config }}
