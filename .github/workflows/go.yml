@@ -43,12 +43,12 @@ jobs:
       run: go build -o viam-appliedmotion -v .
 
     - name: Package
-      run: tar -zcf viam-appliedmotion-${{ env.os }}-${{ matrix.arch }}.tar.gz viam-appliedmotion
+      run: tar -zcf viam-appliedmotion-${{ env.os }}-${{ env.GOARCH }}.tar.gz viam-appliedmotion
     
     - uses: actions/upload-artifact@v3
       with:
-        name: viam-appliedmotion-${{ env.os }}-${{ matrix.arch }}
-        path: viam-appliedmotion-${{ env.os }}-${{ matrix.arch }}.tar.gz
+        name: viam-appliedmotion-${{ env.os }}-${{ env.GOARCH }}
+        path: viam-appliedmotion-${{ env.os }}-${{ env.GOARCH }}.tar.gz
 
   # test:
   #   runs-on: ubuntu-latest
@@ -97,12 +97,12 @@ jobs:
 
     - uses: actions/download-artifact@v3
       with:
-        name: viam-appliedmotion-${{ env.os }}-${{ matrix.arch }}
+        name: viam-appliedmotion-${{ env.os }}-${{ env.GOARCH }}
     - name: Upload
       uses: viamrobotics/upload-module@main
       with:
-        module-path: viam-appliedmotion-${{ env.os }}-${{ matrix.arch }}.tar.gz
+        module-path: viam-appliedmotion-${{ env.os }}-${{ env.GOARCH }}.tar.gz
         namespace: viam-labs
-        platform: ${{ matrix.runner }}/${{ matrix.arch }}
+        platform: ${{ env.GOOS }}/${{ env.GOARCH }}
         version: ${{ github.ref_name }}
         cli-config-secret: ${{ secrets.cli_config }}
