@@ -76,7 +76,7 @@ jobs:
       matrix:
         runner: [ ubuntu-latest, macos-latest ]
         arch: [ amd64, arm64 ]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     needs: [build]
     env:
       os: ${{contains(matrix.runner, 'ubuntu') && 'linux' || contains(matrix.runner, 'macos') && 'macos' || 'unknown'}}
