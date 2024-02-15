@@ -25,7 +25,6 @@ type ST struct {
 	cancelCtx    context.Context
 	cancelFunc   func()
 	comm         CommPort
-	props        motor.Properties
 	minRpm       float64
 	maxRpm       float64
 	acceleration float64
@@ -75,11 +74,6 @@ func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 
 	// In case the module has changed name
 	b.Named = conf.ResourceName().AsNamed()
-
-	// This never really changes, but we'll set it anyway for completeness
-	b.props = motor.Properties{
-		PositionReporting: true,
-	}
 
 	// Update the min/max RPM
 	b.minRpm = newConf.MinRpm
@@ -352,7 +346,7 @@ func (s *ST) Position(ctx context.Context, extra map[string]interface{}) (float6
 
 // Properties implements motor.Motor.
 func (s *ST) Properties(ctx context.Context, extra map[string]interface{}) (motor.Properties, error) {
-	return s.props, nil
+	return motor.Properties{PositionReporting: true}, nil
 }
 
 // ResetZeroPosition implements motor.Motor.
