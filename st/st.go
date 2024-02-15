@@ -155,7 +155,7 @@ func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
 		if val, err := hex.DecodeString(resp); err != nil {
 			return nil, err
 		} else {
-			if len(val) > 2 || len(val) < 2 {
+			if len(val) != 2 {
 				return nil, ErrStatusMessageIncorrectLength
 			}
 			return val, nil
