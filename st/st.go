@@ -304,14 +304,8 @@ func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64
 }
 
 func (s *ST) IsMoving(ctx context.Context) (bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.logger.Debug("IsMoving")
-	status, err := s.getStatus(ctx)
-	if err != nil {
-		return false, err
-	}
-	isMoving, err := isMoving(status)
+	s.logger.Debug("IsMoving forwarded to IsPowered")
+	isMoving, _, err := s.IsPowered(ctx, nil)
 	return isMoving, err
 }
 
