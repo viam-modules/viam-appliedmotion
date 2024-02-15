@@ -353,8 +353,6 @@ func (s *ST) Properties(ctx context.Context, extra map[string]interface{}) (moto
 func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// EP0?
-	// SP0?
 	// The docs seem to indicate that for proper reset to 0, you must send both EP0 and SP0
 	s.logger.Debugf("ResetZeroPosition: offset=%v", offset)
 	// First reset the encoder
