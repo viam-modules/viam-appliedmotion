@@ -239,15 +239,12 @@ func (s *ST) Close(ctx context.Context) error {
 func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// FL
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
 	// need to convert from revs to steps
 	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
-	// need to convert from RPM to revs per second
-	revSec := rpm / 60
 
 	// Now send the configuration commands to setup the motor for the move
-	s.configureMove(ctx, positionSteps, revSec)
+	s.configureMove(ctx, positionSteps, rpm)
 
 	// Then actually execute the move
 	if _, err := s.comm.Send(ctx, "FL"); err != nil {
@@ -268,10 +265,8 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	s.logger.Debugf("GoTo: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
 	// need to convert from revs to steps
 	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
-	// need to convert from RPM to revs per second
-	revSec := rpm / 60
 	// Now send the configuration commands to setup the motor for the move
-	s.configureMove(ctx, positionSteps, revSec)
+	s.configureMove(ctx, positionSteps, rpm)
 
 	// Now execute the move command
 	if _, err := s.comm.Send(ctx, "FP"); err != nil {
@@ -282,7 +277,9 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	return s.waitForMoveCommandToComplete(ctx)
 }
 
-func (s *ST) configureMove(ctx context.Context, positionSteps int64, revSec float64) error {
+func (s *ST) configureMove(ctx context.Context, positionSteps int64, rpm float64) error {
+	// need to convert from RPM to revs per second
+	revSec := rpm / 60
 	// Set the distance first
 	if _, err := s.comm.Send(ctx, fmt.Sprintf("DI%d", positionSteps)); err != nil {
 		return err
@@ -400,10 +397,8 @@ func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 
 		// need to convert from revs to steps
 		positionSteps := int64(math.MaxInt32)
-		// need to convert from RPM to revs per second
-		revSec := desiredRpm / 60
 		// Now send the configuration commands to setup the motor for the move
-		s.configureMove(ctx, positionSteps, revSec)
+		s.configureMove(ctx, positionSteps, desiredRpm)
 
 		// Now execute the move command
 		if _, err := s.comm.Send(ctx, "FP"); err != nil {
