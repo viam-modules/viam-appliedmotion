@@ -78,7 +78,6 @@ func (s *comms) Send(ctx context.Context, command string) (string, error) {
 	// TODO: Check the return value to see if it resulted in an error (and wrap it) or was a success
 	retString := string(readBuffer[:nRead])
 	s.logger.Debugf("Response: %#v", retString)
-	time.Sleep(1 * time.Millisecond)
 	return retString, nil
 }
 
