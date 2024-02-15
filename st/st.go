@@ -370,11 +370,14 @@ func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 
 // SetPower implements motor.Motor.
 func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	// We could tell it to move at a certain speed for a very large number of rotations, but that's
+	// as close as this motor gets to having a "set power" function. A sketch of that
+	// implementation is commented out below.
 	return errors.New("set power is not supported for this motor")
 	/*
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
 		// VE? This is in rev/sec
 		desiredRpm := s.maxRpm * powerPct
 		s.logger.Warn("SetPower called on motor that uses rotational velocity. Scaling %v based on max Rpm %v. Resulting power: %v", powerPct, s.maxRpm, desiredRpm)
