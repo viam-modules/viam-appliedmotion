@@ -138,6 +138,7 @@ func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
 	if resp, err := s.comm.Send(ctx, "SC"); err != nil {
 		return nil, err
 	} else {
+		// TODO: document this better, once you've read the manual.
 
 		// Response format: "\x00\aSC=0009{63\r"
 		// we need to strip off the command and any leading or trailing stuff
@@ -163,6 +164,7 @@ func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
 }
 
 func isMoving(status []byte) (bool, error) {
+	// TODO: document what status is
 	if len(status) != 2 {
 		return false, ErrStatusMessageIncorrectLength
 	}
@@ -180,6 +182,7 @@ func (s *ST) getBufferStatus(ctx context.Context) (int, error) {
 	if resp, err := s.comm.Send(ctx, "BS"); err != nil {
 		return -1, err
 	} else {
+		// TODO: document this better. The current comment doesn't match the code.
 		// The response should look something like BS=<num>\r
 		startIndex := strings.Index(resp, "=")
 		if startIndex == -1 {
