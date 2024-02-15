@@ -240,11 +240,9 @@ func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
-	// need to convert from revs to steps
-	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
 
-	// Now send the configuration commands to setup the motor for the move
-	s.configureMove(ctx, positionSteps, rpm)
+	// Send the configuration commands to setup the motor for the move
+	s.configureMove(ctx, positionRevolutions, rpm)
 
 	// Then actually execute the move
 	if _, err := s.comm.Send(ctx, "FL"); err != nil {
@@ -263,10 +261,8 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	// 	DI8000
 	// 	FP
 	s.logger.Debugf("GoTo: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
-	// need to convert from revs to steps
-	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
-	// Now send the configuration commands to setup the motor for the move
-	s.configureMove(ctx, positionSteps, rpm)
+	// Send the configuration commands to setup the motor for the move
+	s.configureMove(ctx, positionRevolutions, rpm)
 
 	// Now execute the move command
 	if _, err := s.comm.Send(ctx, "FP"); err != nil {
@@ -277,9 +273,11 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	return s.waitForMoveCommandToComplete(ctx)
 }
 
-func (s *ST) configureMove(ctx context.Context, positionSteps int64, rpm float64) error {
+func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64) error {
 	// need to convert from RPM to revs per second
 	revSec := rpm / 60
+	// need to convert from revs to steps
+	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
 	// Set the distance first
 	if _, err := s.comm.Send(ctx, fmt.Sprintf("DI%d", positionSteps)); err != nil {
 		return err
@@ -395,10 +393,8 @@ func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 		desiredRpm := s.maxRpm * powerPct
 		s.logger.Warn("SetPower called on motor that uses rotational velocity. Scaling %v based on max Rpm %v. Resulting power: %v", powerPct, s.maxRpm, desiredRpm)
 
-		// need to convert from revs to steps
-		positionSteps := int64(math.MaxInt32)
-		// Now send the configuration commands to setup the motor for the move
-		s.configureMove(ctx, positionSteps, desiredRpm)
+		// Send the configuration commands to setup the motor for the move
+		s.configureMove(ctx, int64(math.MaxInt32), desiredRpm)
 
 		// Now execute the move command
 		if _, err := s.comm.Send(ctx, "FP"); err != nil {
