@@ -3,6 +3,7 @@ package st
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"net"
@@ -77,7 +78,14 @@ func (s *comms) Send(ctx context.Context, command string) (string, error) {
 	// TODO: Check the return value to see if it resulted in an error (and wrap it) or was a success
 	retString := string(readBuffer[:nRead])
 	s.logger.Debugf("Response: %#v", retString)
-	return retString, nil
+
+	// The response should start with 0x00 0x0a and end with 0x0D (carriage return). We only check
+	// the carriage return at the end, because it's possible that some other motor has different
+	// bytes at the beginning.
+	if retString[nRead-1] != '\r' {
+		return "", fmt.Errorf("unexpected response from motor controller: %#v", retString)
+	}
+	return retString[2:nRead-1], nil
 }
 
 func (s *comms) Close() error {

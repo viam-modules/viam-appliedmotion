@@ -147,7 +147,7 @@ func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
 	} else {
 		// TODO: document this better, once you've read the manual.
 
-		// Response format: "\x00\aSC=0009{63\r"
+		// Response format: "SC=0009{63"
 		// we need to strip off the command and any leading or trailing stuff
 		startIndex := strings.Index(resp, "=")
 		if startIndex == -1 {
@@ -182,7 +182,7 @@ func (s *ST) getBufferStatus(ctx context.Context) (int, error) {
 		return -1, err
 	} else {
 		// TODO: document this better. The current comment doesn't match the code.
-		// The response should look something like BS=<num>\r
+		// The response should look something like BS=<num>
 		startIndex := strings.Index(resp, "=")
 		if startIndex == -1 {
 			return -1, fmt.Errorf("unable to find response data in %v", resp)
@@ -336,11 +336,7 @@ func (s *ST) Position(ctx context.Context, extra map[string]interface{}) (float6
 		if startIndex == -1 {
 			return 0, fmt.Errorf("unexpected response %v", resp)
 		}
-		endIndex := strings.Index(resp, "\r")
-		if endIndex == -1 {
-			return 0, fmt.Errorf("unexpected response %v", resp)
-		}
-		resp = resp[startIndex+1 : endIndex]
+		resp = resp[startIndex+1:]
 		if val, err := strconv.ParseUint(resp, 16, 32); err != nil {
 			return 0, err
 		} else {
