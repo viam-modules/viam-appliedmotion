@@ -82,9 +82,6 @@ func (s *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	// Update the steps per rev
 	s.stepsPerRev = newConf.StepsPerRev
 
-	s.acceleration = newConf.Acceleration
-	s.deceleration = newConf.Deceleration
-
 	// If we have an old comm object, shut it down. We'll set it up again next paragraph.
 	if s.comm != nil {
 		s.comm.Close()
@@ -95,6 +92,27 @@ func (s *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 		return err
 	} else {
 		s.comm = comm
+	}
+
+	s.acceleration = newConf.Acceleration
+	if s.acceleration > 0 {
+		if _, err := s.comm.Send(ctx, fmt.Sprintf("AC%.3f", s.acceleration)); err != nil {
+			return err
+		}
+	}
+
+	s.deceleration = newConf.Deceleration
+	if s.deceleration > 0 {
+		if _, err := s.comm.Send(ctx, fmt.Sprintf("DE%.3f", s.deceleration)); err != nil {
+			return err
+		}
+	}
+	// Set the maximum deceleration when stopping a move in the middle, too.
+	stopDecel := math.Max(s.acceleration, s.deceleration)
+	if stopDecel > 0 {
+		if _, err := s.comm.Send(ctx, fmt.Sprintf("AM%.3f", stopDecel)); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -266,26 +284,6 @@ func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64
 	// Now set the velocity
 	if _, err := s.comm.Send(ctx, fmt.Sprintf("VE%.4f", revSec)); err != nil {
 		return err
-	}
-
-	// Set the acceleration, if we have it
-	if s.acceleration > 0 {
-		if _, err := s.comm.Send(ctx, fmt.Sprintf("AC%.3f", s.acceleration)); err != nil {
-			return err
-		}
-	}
-	// Set the deceleration, if we have it
-	if s.deceleration > 0 {
-		if _, err := s.comm.Send(ctx, fmt.Sprintf("DE%.3f", s.deceleration)); err != nil {
-			return err
-		}
-	}
-	// Set the maximum deceleration when stopping a move in the middle, too.
-	stopDecel := math.Max(s.acceleration, s.deceleration)
-	if stopDecel > 0 {
-		if _, err := s.comm.Send(ctx, fmt.Sprintf("AM%.3f", stopDecel)); err != nil {
-			return err
-		}
 	}
 
 	return nil
