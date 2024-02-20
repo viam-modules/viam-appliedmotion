@@ -48,7 +48,7 @@ func NewMotor(ctx context.Context, deps resource.Dependencies, conf resource.Con
 	logger.Info("Starting Applied Motion Products ST Motor Driver v0.1")
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
-	b := ST{
+	s := ST{
 		Named:      conf.ResourceName().AsNamed(),
 		logger:     logger,
 		cancelCtx:  cancelCtx,
@@ -56,16 +56,16 @@ func NewMotor(ctx context.Context, deps resource.Dependencies, conf resource.Con
 		mu:         sync.RWMutex{},
 	}
 
-	if err := b.Reconfigure(ctx, deps, conf); err != nil {
+	if err := s.Reconfigure(ctx, deps, conf); err != nil {
 		return nil, err
 	}
-	return &b, nil
+	return &s, nil
 }
 
-func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf resource.Config) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.logger.Debug("Reconfiguring Applied Motion Products ST Motor Driver")
+func (s *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf resource.Config) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.logger.Debug("Reconfiguring Applied Motion Products ST Motor Driver")
 
 	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
@@ -73,28 +73,28 @@ func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	}
 
 	// In case the module has changed name
-	b.Named = conf.ResourceName().AsNamed()
+	s.Named = conf.ResourceName().AsNamed()
 
 	// Update the min/max RPM
-	b.minRpm = newConf.MinRpm
-	b.maxRpm = newConf.MaxRpm
+	s.minRpm = newConf.MinRpm
+	s.maxRpm = newConf.MaxRpm
 
 	// Update the steps per rev
-	b.stepsPerRev = newConf.StepsPerRev
+	s.stepsPerRev = newConf.StepsPerRev
 
-	b.acceleration = newConf.Acceleration
-	b.deceleration = newConf.Deceleration
+	s.acceleration = newConf.Acceleration
+	s.deceleration = newConf.Deceleration
 
 	// If we have an old comm object, shut it down. We'll set it up again next paragraph.
-	if b.comm != nil {
-		b.comm.Close()
-		b.comm = nil
+	if s.comm != nil {
+		s.comm.Close()
+		s.comm = nil
 	}
 
-	if comm, err := getComm(b.cancelCtx, newConf, b.logger); err != nil {
+	if comm, err := getComm(s.cancelCtx, newConf, s.logger); err != nil {
 		return err
 	} else {
-		b.comm = comm
+		s.comm = comm
 	}
 
 	return nil
