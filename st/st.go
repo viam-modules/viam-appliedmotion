@@ -160,6 +160,13 @@ func isMoving(status []byte) (bool, error) {
 	return (status[1]>>4)&1 == 1, nil
 }
 
+func isEnabled(status []byte) (bool, error) {
+	if len(status) != 2 {
+		return false, ErrStatusMessageIncorrectLength
+	}
+	return status[1] & 1 == 1, nil
+}
+
 func inPosition(status []byte) (bool, error) {
 	if len(status) != 2 {
 		return false, ErrStatusMessageIncorrectLength
@@ -293,9 +300,14 @@ func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64
 }
 
 func (s *ST) IsMoving(ctx context.Context) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.logger.Debug("IsMoving forwarded to IsPowered")
-	isMoving, _, err := s.IsPowered(ctx, nil)
-	return isMoving, err
+	status, err := s.getStatus(ctx)
+	if err != nil {
+		return false, err
+	}
+	return isEnabled(status)
 }
 
 // IsPowered implements motor.Motor.
