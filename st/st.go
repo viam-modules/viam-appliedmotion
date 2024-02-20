@@ -307,7 +307,7 @@ func (s *ST) IsMoving(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return isEnabled(status)
+	return isMoving(status)
 }
 
 // IsPowered implements motor.Motor.
@@ -319,8 +319,11 @@ func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool,
 	if err != nil {
 		return false, 0, err
 	}
-	isMoving, err := isMoving(status)
-	return isMoving, 0, err
+	enabled, err := isEnabled(status)
+	// The second return value is supposed to be the fraction of power sent to the motor, between 0
+	// (off) and 1 (maximum power). It's unclear how to implement this for a stepper motor, so we
+	// return 0 no matter what.
+	return enabled, 0, err
 }
 
 // Position implements motor.Motor.
