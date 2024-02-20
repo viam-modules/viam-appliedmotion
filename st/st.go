@@ -308,7 +308,7 @@ func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool,
 		return false, 0, err
 	}
 	if len(status) != 2 {
-		return false, ErrStatusMessageIncorrectLength
+		return false, 0, ErrStatusMessageIncorrectLength
 	}
 	// The second return value is supposed to be the fraction of power sent to the motor, between 0
 	// (off) and 1 (maximum power). It's unclear how to implement this for a stepper motor, so we
