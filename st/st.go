@@ -85,19 +85,16 @@ func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	b.acceleration = newConf.Acceleration
 	b.deceleration = newConf.Deceleration
 
-	// If we have an old comm object but it doesn't match the new config, shut it down and pretend
-	// it never existed.
-	if b.comm != nil && b.comm.GetUri() != newConf.URI {
+	// If we have an old comm object, shut it down. We'll set it up again next paragraph.
+	if b.comm != nil {
 		b.comm.Close()
-		b.comm = nil // Create a new one next paragraph.
+		b.comm = nil
 	}
 
-	if b.comm == nil {
-		if comm, err := getComm(b.cancelCtx, newConf, b.logger); err != nil {
-			return err
-		} else {
-			b.comm = comm
-		}
+	if comm, err := getComm(b.cancelCtx, newConf, b.logger); err != nil {
+		return err
+	} else {
+		b.comm = comm
 	}
 
 	return nil
