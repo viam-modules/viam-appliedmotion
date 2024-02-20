@@ -103,9 +103,7 @@ func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 func getComm(ctx context.Context, conf *Config, logger golog.Logger) (CommPort, error) {
 	switch {
 	case strings.ToLower(conf.Protocol) == "can":
-		// logger.Debug("Creating CAN Comm Port")
 		return nil, fmt.Errorf("unsupported comm type %s", conf.Protocol)
-		// return newCanComm(ctx, conf.URI, logger)
 	case strings.ToLower(conf.Protocol) == "ip":
 		logger.Debug("Creating IP Comm Port")
 		if conf.ConnectTimeout == 0 {
