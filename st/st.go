@@ -152,21 +152,6 @@ func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
 	}
 }
 
-func isMoving(status []byte) (bool, error) {
-	// TODO: document what status is
-	if len(status) != 2 {
-		return false, ErrStatusMessageIncorrectLength
-	}
-	return (status[1]>>4)&1 == 1, nil
-}
-
-func isEnabled(status []byte) (bool, error) {
-	if len(status) != 2 {
-		return false, ErrStatusMessageIncorrectLength
-	}
-	return status[1] & 1 == 1, nil
-}
-
 func inPosition(status []byte) (bool, error) {
 	if len(status) != 2 {
 		return false, ErrStatusMessageIncorrectLength
@@ -300,30 +285,35 @@ func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64
 }
 
 func (s *ST) IsMoving(ctx context.Context) (bool, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// If we locked the mutex, we'd block until after any GoFor or GoTo commands were finished! We
+	// also aren't mutating any state in the struct itself, so there is no need to lock it.
 	s.logger.Debug("IsMoving")
 	status, err := s.getStatus(ctx)
+
 	if err != nil {
 		return false, err
 	}
-	return isMoving(status)
+	if len(status) != 2 {
+		return false, ErrStatusMessageIncorrectLength
+	}
+	return (status[1]>>4)&1 == 1, nil
 }
 
 // IsPowered implements motor.Motor.
 func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool, float64, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	// The same as IsMoving, don't lock the mutex.
 	s.logger.Debugf("IsPowered: extra=%v", extra)
 	status, err := s.getStatus(ctx)
 	if err != nil {
 		return false, 0, err
 	}
-	enabled, err := isEnabled(status)
+	if len(status) != 2 {
+		return false, 0, ErrStatusMessageIncorrectLength
+	}
 	// The second return value is supposed to be the fraction of power sent to the motor, between 0
 	// (off) and 1 (maximum power). It's unclear how to implement this for a stepper motor, so we
 	// return 0 no matter what.
-	return enabled, 0, err
+	return (status[1] & 1 == 1), 0, err
 }
 
 // Position implements motor.Motor.

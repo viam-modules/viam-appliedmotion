@@ -45,9 +45,11 @@ func TestMotorIsMoving(t *testing.T) {
 	isMoving, err := motor.IsMoving(ctx)
 	assert.Nil(t, err, "failed to get motor status")
 	assert.False(t, isMoving, "motor should be stopped")
+	done := make(chan bool)
 	go func() {
 		err = motor.GoFor(ctx, 600, 10, nil)
 		assert.Nil(t, err, "error executing move command")
+		close(done)
 	}()
 	// Sleep a bit to let the motor get going
 	time.Sleep(50 * time.Millisecond)
@@ -55,6 +57,8 @@ func TestMotorIsMoving(t *testing.T) {
 	isMoving, err = motor.IsMoving(ctx)
 	assert.Nil(t, err, "failed to get motor status")
 	assert.True(t, isMoving, "motor should be moving")
+
+	<-done // Wait for the motor to stop before going to the next test.
 }
 
 func TestStatusFunctions(t *testing.T) {
@@ -66,7 +70,7 @@ func TestStatusFunctions(t *testing.T) {
 	inPosition, err := inPosition(status)
 	assert.Nil(t, err, "failed to get in position from status")
 	assert.True(t, inPosition, "expected motor to be in position, status %#v", status)
-	isMoving, err := isMoving(status)
+	isMoving, err := motor.IsMoving(ctx)
 	assert.Nil(t, err, "failed to get is moving from status")
 	assert.False(t, isMoving, "expected motor to be stopped, status %#v", status)
 
