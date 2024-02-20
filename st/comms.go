@@ -14,7 +14,6 @@ import (
 )
 
 type CommPort interface {
-	GetUri() string
 	Send(ctx context.Context, command string) (string, error)
 	Close() error
 }
@@ -86,8 +85,4 @@ func (s *comms) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.handle.Close()
-}
-
-func (s *comms) GetUri() string {
-	return s.URI
 }
