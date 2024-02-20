@@ -289,7 +289,6 @@ func (s *ST) IsMoving(ctx context.Context) (bool, error) {
 	// also aren't mutating any state in the struct itself, so there is no need to lock it.
 	s.logger.Debug("IsMoving")
 	status, err := s.getStatus(ctx)
-	fmt.Println("isMoving status is", status)
 
 	if err != nil {
 		return false, err
