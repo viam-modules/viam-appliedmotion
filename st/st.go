@@ -25,7 +25,6 @@ type ST struct {
 	cancelCtx    context.Context
 	cancelFunc   func()
 	comm         CommPort
-	props        motor.Properties
 	minRpm       float64
 	maxRpm       float64
 	acceleration float64
@@ -76,11 +75,6 @@ func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	// In case the module has changed name
 	b.Named = conf.ResourceName().AsNamed()
 
-	// This never really changes, but we'll set it anyway for completeness
-	b.props = motor.Properties{
-		PositionReporting: true,
-	}
-
 	// Update the min/max RPM
 	b.minRpm = newConf.MinRpm
 	b.maxRpm = newConf.MaxRpm
@@ -91,25 +85,16 @@ func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	b.acceleration = newConf.Acceleration
 	b.deceleration = newConf.Deceleration
 
-	// Check if the comm object exists at all, if not, create it, this is because we're overloading
-	// this reconfigure method and using it during construction as well.
-	if b.comm == nil {
-		if comm, err := getComm(b.cancelCtx, newConf, b.logger); err != nil {
-			return err
-		} else {
-			b.comm = comm
-		}
+	// If we have an old comm object, shut it down. We'll set it up again next paragraph.
+	if b.comm != nil {
+		b.comm.Close()
+		b.comm = nil
 	}
 
-	// Check if the current config matches the new config, if not, replace the comm object
-	// This should be a no-op on the first run through
-	if b.comm.GetUri() != newConf.URI {
-		b.comm.Close()
-		if newComm, err := getComm(b.cancelCtx, newConf, b.logger); err != nil {
-			return err
-		} else {
-			b.comm = newComm
-		}
+	if comm, err := getComm(b.cancelCtx, newConf, b.logger); err != nil {
+		return err
+	} else {
+		b.comm = comm
 	}
 
 	return nil
@@ -118,9 +103,7 @@ func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 func getComm(ctx context.Context, conf *Config, logger golog.Logger) (CommPort, error) {
 	switch {
 	case strings.ToLower(conf.Protocol) == "can":
-		// logger.Debug("Creating CAN Comm Port")
 		return nil, fmt.Errorf("unsupported comm type %s", conf.Protocol)
-		// return newCanComm(ctx, conf.URI, logger)
 	case strings.ToLower(conf.Protocol) == "ip":
 		logger.Debug("Creating IP Comm Port")
 		if conf.ConnectTimeout == 0 {
@@ -144,6 +127,7 @@ func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
 	if resp, err := s.comm.Send(ctx, "SC"); err != nil {
 		return nil, err
 	} else {
+		// TODO: document this better, once you've read the manual.
 
 		// Response format: "\x00\aSC=0009{63\r"
 		// we need to strip off the command and any leading or trailing stuff
@@ -160,7 +144,7 @@ func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
 		if val, err := hex.DecodeString(resp); err != nil {
 			return nil, err
 		} else {
-			if len(val) > 2 || len(val) < 2 {
+			if len(val) != 2 {
 				return nil, ErrStatusMessageIncorrectLength
 			}
 			return val, nil
@@ -169,10 +153,18 @@ func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
 }
 
 func isMoving(status []byte) (bool, error) {
+	// TODO: document what status is
 	if len(status) != 2 {
 		return false, ErrStatusMessageIncorrectLength
 	}
 	return (status[1]>>4)&1 == 1, nil
+}
+
+func isEnabled(status []byte) (bool, error) {
+	if len(status) != 2 {
+		return false, ErrStatusMessageIncorrectLength
+	}
+	return status[1] & 1 == 1, nil
 }
 
 func inPosition(status []byte) (bool, error) {
@@ -186,6 +178,7 @@ func (s *ST) getBufferStatus(ctx context.Context) (int, error) {
 	if resp, err := s.comm.Send(ctx, "BS"); err != nil {
 		return -1, err
 	} else {
+		// TODO: document this better. The current comment doesn't match the code.
 		// The response should look something like BS=<num>\r
 		startIndex := strings.Index(resp, "=")
 		if startIndex == -1 {
@@ -242,15 +235,10 @@ func (s *ST) Close(ctx context.Context) error {
 func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// FL
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
-	// need to convert from revs to steps
-	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
-	// need to convert from RPM to revs per second
-	revSec := rpm / 60
 
-	// Now send the configuration commands to setup the motor for the move
-	s.configureMove(ctx, positionSteps, revSec)
+	// Send the configuration commands to setup the motor for the move
+	s.configureMove(ctx, positionRevolutions, rpm)
 
 	// Then actually execute the move
 	if _, err := s.comm.Send(ctx, "FL"); err != nil {
@@ -269,12 +257,8 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	// 	DI8000
 	// 	FP
 	s.logger.Debugf("GoTo: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
-	// need to convert from revs to steps
-	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
-	// need to convert from RPM to revs per second
-	revSec := rpm / 60
-	// Now send the configuration commands to setup the motor for the move
-	s.configureMove(ctx, positionSteps, revSec)
+	// Send the configuration commands to setup the motor for the move
+	s.configureMove(ctx, positionRevolutions, rpm)
 
 	// Now execute the move command
 	if _, err := s.comm.Send(ctx, "FP"); err != nil {
@@ -285,7 +269,11 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	return s.waitForMoveCommandToComplete(ctx)
 }
 
-func (s *ST) configureMove(ctx context.Context, positionSteps int64, revSec float64) error {
+func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64) error {
+	// need to convert from RPM to revs per second
+	revSec := rpm / 60
+	// need to convert from revs to steps
+	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
 	// Set the distance first
 	if _, err := s.comm.Send(ctx, fmt.Sprintf("DI%d", positionSteps)); err != nil {
 		return err
@@ -319,8 +307,7 @@ func (s *ST) IsMoving(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	isMoving, err := isMoving(status)
-	return isMoving, err
+	return isMoving(status)
 }
 
 // IsPowered implements motor.Motor.
@@ -332,8 +319,11 @@ func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool,
 	if err != nil {
 		return false, 0, err
 	}
-	isMoving, err := isMoving(status)
-	return isMoving, 0, err
+	enabled, err := isEnabled(status)
+	// The second return value is supposed to be the fraction of power sent to the motor, between 0
+	// (off) and 1 (maximum power). It's unclear how to implement this for a stepper motor, so we
+	// return 0 no matter what.
+	return enabled, 0, err
 }
 
 // Position implements motor.Motor.
@@ -366,15 +356,13 @@ func (s *ST) Position(ctx context.Context, extra map[string]interface{}) (float6
 
 // Properties implements motor.Motor.
 func (s *ST) Properties(ctx context.Context, extra map[string]interface{}) (motor.Properties, error) {
-	return s.props, nil
+	return motor.Properties{PositionReporting: true}, nil
 }
 
 // ResetZeroPosition implements motor.Motor.
 func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// EP0?
-	// SP0?
 	// The docs seem to indicate that for proper reset to 0, you must send both EP0 and SP0
 	s.logger.Debugf("ResetZeroPosition: offset=%v", offset)
 	// First reset the encoder
@@ -392,21 +380,20 @@ func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 
 // SetPower implements motor.Motor.
 func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
+	// We could tell it to move at a certain speed for a very large number of rotations, but that's
+	// as close as this motor gets to having a "set power" function. A sketch of that
+	// implementation is commented out below.
 	return errors.New("set power is not supported for this motor")
 	/*
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
 		// VE? This is in rev/sec
 		desiredRpm := s.maxRpm * powerPct
 		s.logger.Warn("SetPower called on motor that uses rotational velocity. Scaling %v based on max Rpm %v. Resulting power: %v", powerPct, s.maxRpm, desiredRpm)
 
-		// need to convert from revs to steps
-		positionSteps := int64(math.MaxInt32)
-		// need to convert from RPM to revs per second
-		revSec := desiredRpm / 60
-		// Now send the configuration commands to setup the motor for the move
-		s.configureMove(ctx, positionSteps, revSec)
+		// Send the configuration commands to setup the motor for the move
+		s.configureMove(ctx, int64(math.MaxInt32), desiredRpm)
 
 		// Now execute the move command
 		if _, err := s.comm.Send(ctx, "FP"); err != nil {

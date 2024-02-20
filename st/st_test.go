@@ -1,5 +1,8 @@
 package st
 
+// NOTE: this test uses actual hardware on your local network! It does not use mocked-out hardware,
+// and will fail if you don't have a motor controller at the IP address 10.10.10.10.
+
 import (
 	"context"
 	"testing"

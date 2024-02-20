@@ -35,7 +35,10 @@ func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger go
 		Deadline:  time.Now().Add(timeout),
 	}
 	socket, err := d.DialContext(ctx, "tcp", uri)
-	return &comms{handle: socket, URI: uri, logger: logger, mu: sync.RWMutex{}}, err
+	if err != nil {
+		return nil, err
+	}
+	return &comms{handle: socket, URI: uri, logger: logger, mu: sync.RWMutex{}}, nil
 }
 
 func newSerialComm(ctx context.Context, file string, logger golog.Logger) (*comms, error) {
@@ -75,7 +78,6 @@ func (s *comms) Send(ctx context.Context, command string) (string, error) {
 	// TODO: Check the return value to see if it resulted in an error (and wrap it) or was a success
 	retString := string(readBuffer[:nRead])
 	s.logger.Debugf("Response: %#v", retString)
-	time.Sleep(1 * time.Millisecond)
 	return retString, nil
 }
 
