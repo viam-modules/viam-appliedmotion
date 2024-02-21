@@ -62,7 +62,7 @@ func (os *oldAcceleration) restore(ctx context.Context, comms commPort) error {
 		if value == 0.0 {
 			return nil // No old state stored
 		}
-		_, err := comms.Send(ctx, formatStore(command, value))
+		_, err := comms.send(ctx, formatStore(command, value))
 		return err
 	}
 
@@ -83,11 +83,11 @@ func formatStore(name string, value float64) string {
 // previous acceleration value. Later, you can use that return value to restore the acceleration to
 // its original setting.
 func replaceValue(ctx context.Context, s commPort, command string) (string, error) {
-	response, err := s.Send(ctx, command[:2])
+	response, err := s.send(ctx, command[:2])
 	if err != nil {
 		return "", err
 	}
-	if _, err := s.Send(ctx, command); err != nil {
+	if _, err := s.send(ctx, command); err != nil {
 		return "", err
 	}
 	return response, nil

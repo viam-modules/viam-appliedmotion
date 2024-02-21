@@ -97,21 +97,21 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 
 	s.acceleration = newConf.acceleration
 	if s.acceleration > 0 {
-		if _, err := s.comm.Send(ctx, fmt.Sprintf("AC%.3f", s.acceleration)); err != nil {
+		if _, err := s.comm.send(ctx, fmt.Sprintf("AC%.3f", s.acceleration)); err != nil {
 			return err
 		}
 	}
 
 	s.deceleration = newConf.deceleration
 	if s.deceleration > 0 {
-		if _, err := s.comm.Send(ctx, fmt.Sprintf("DE%.3f", s.deceleration)); err != nil {
+		if _, err := s.comm.send(ctx, fmt.Sprintf("DE%.3f", s.deceleration)); err != nil {
 			return err
 		}
 	}
 	// Set the maximum deceleration when stopping a move in the middle, too.
 	stopDecel := math.Max(s.acceleration, s.deceleration)
 	if stopDecel > 0 {
-		if _, err := s.comm.Send(ctx, fmt.Sprintf("AM%.3f", stopDecel)); err != nil {
+		if _, err := s.comm.send(ctx, fmt.Sprintf("AM%.3f", stopDecel)); err != nil {
 			return err
 		}
 	}
@@ -143,7 +143,7 @@ func getComm(ctx context.Context, conf *config, logger golog.Logger) (commPort, 
 }
 
 func (s *st) getStatus(ctx context.Context) ([]byte, error) {
-	if resp, err := s.comm.Send(ctx, "SC"); err != nil {
+	if resp, err := s.comm.send(ctx, "SC"); err != nil {
 		return nil, err
 	} else {
 		// TODO: document this better, once you've read the manual.
@@ -179,7 +179,7 @@ func inPosition(status []byte) (bool, error) {
 }
 
 func (s *st) getBufferStatus(ctx context.Context) (int, error) {
-	if resp, err := s.comm.Send(ctx, "BS"); err != nil {
+	if resp, err := s.comm.send(ctx, "BS"); err != nil {
 		return -1, err
 	} else {
 		// TODO: document this better. The current comment doesn't match the code.
@@ -250,7 +250,7 @@ func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 	s.configureMove(ctx, positionRevolutions, rpm)
 
 	// Then actually execute the move
-	if _, err := s.comm.Send(ctx, "FL"); err != nil {
+	if _, err := s.comm.send(ctx, "FL"); err != nil {
 		return err
 	}
 	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
@@ -276,7 +276,7 @@ func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	s.configureMove(ctx, positionRevolutions, rpm)
 
 	// Now execute the move command
-	if _, err := s.comm.Send(ctx, "FP"); err != nil {
+	if _, err := s.comm.send(ctx, "FP"); err != nil {
 		return err
 	}
 	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
@@ -289,12 +289,12 @@ func (s *st) configureMove(ctx context.Context, positionRevolutions, rpm float64
 	// need to convert from revs to steps
 	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
 	// Set the distance first
-	if _, err := s.comm.Send(ctx, fmt.Sprintf("DI%d", positionSteps)); err != nil {
+	if _, err := s.comm.send(ctx, fmt.Sprintf("DI%d", positionSteps)); err != nil {
 		return err
 	}
 
 	// Now set the velocity
-	if _, err := s.comm.Send(ctx, fmt.Sprintf("VE%.4f", revSec)); err != nil {
+	if _, err := s.comm.send(ctx, fmt.Sprintf("VE%.4f", revSec)); err != nil {
 		return err
 	}
 
@@ -341,7 +341,7 @@ func (s *st) Position(ctx context.Context, extra map[string]interface{}) (float6
 	// EP?
 	// IP?
 	// The response should look something like IP=<num>\r
-	if resp, err := s.comm.Send(ctx, "IP"); err != nil {
+	if resp, err := s.comm.send(ctx, "IP"); err != nil {
 		return 0, err
 	} else {
 		startIndex := strings.Index(resp, "=")
@@ -369,12 +369,12 @@ func (s *st) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 	// The docs seem to indicate that for proper reset to 0, you must send both EP0 and SP0
 	s.logger.Debugf("ResetZeroPosition: offset=%v", offset)
 	// First reset the encoder
-	if _, err := s.comm.Send(ctx, "EP0"); err != nil {
+	if _, err := s.comm.send(ctx, "EP0"); err != nil {
 		return err
 	}
 
 	// Then reset the internal position
-	if _, err := s.comm.Send(ctx, "SP0"); err != nil {
+	if _, err := s.comm.send(ctx, "SP0"); err != nil {
 		return err
 	}
 
@@ -399,7 +399,7 @@ func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 		s.configureMove(ctx, int64(math.MaxInt32), desiredRpm)
 
 		// Now execute the move command
-		if _, err := s.comm.Send(ctx, "FP"); err != nil {
+		if _, err := s.comm.send(ctx, "FP"); err != nil {
 			return err
 		}
 		// We explicitly don't want to wait for the command to finish
@@ -413,7 +413,7 @@ func (s *st) Stop(ctx context.Context, extras map[string]interface{}) error {
 	// SM - Stop Move? Stops and leaves queue intact?
 	// ST - Halts the current buffered command being executed, but does not affect other buffered commands in the command buffer
 	s.logger.Debugf("Stop called with %v", extras)
-	_, err := s.comm.Send(ctx, "SK") // Stop the current move and clear any queued moves, too.
+	_, err := s.comm.send(ctx, "SK") // Stop the current move and clear any queued moves, too.
 	if err != nil {
 		return err
 	}
@@ -425,6 +425,6 @@ func (s *st) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[str
 	defer s.mu.Unlock()
 	s.logger.Debug("DoCommand called with %v", cmd)
 	command := cmd["command"].(string)
-	response, err := s.comm.Send(ctx, command)
+	response, err := s.comm.send(ctx, command)
 	return map[string]interface{}{"response": response}, err
 }
