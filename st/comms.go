@@ -14,10 +14,7 @@ import (
 	"github.com/edaniels/golog"
 )
 
-type commPort interface {
-	Send(ctx context.Context, command string) (string, error)
-	Close() error
-}
+type commPort = *comms
 
 type comms struct {
 	mu     sync.RWMutex
@@ -27,7 +24,7 @@ type comms struct {
 	handle io.ReadWriteCloser
 }
 
-func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger golog.Logger) (*comms, error) {
+func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger golog.Logger) (commPort, error) {
 	logger.Debugf("Dialing %s", uri)
 	d := net.Dialer{
 		Timeout:   timeout,
@@ -41,7 +38,7 @@ func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger go
 	return &comms{handle: socket, uri: uri, logger: logger, mu: sync.RWMutex{}}, nil
 }
 
-func newSerialComm(ctx context.Context, file string, logger golog.Logger) (*comms, error) {
+func newSerialComm(ctx context.Context, file string, logger golog.Logger) (commPort, error) {
 	logger.Debugf("Opening %s", file)
 	if fd, err := os.OpenFile(file, os.O_RDWR, fs.FileMode(os.O_RDWR)); err != nil {
 		return nil, err
