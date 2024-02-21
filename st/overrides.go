@@ -7,7 +7,7 @@ import (
 	"go.uber.org/multierr"
 )
 
-type OldState struct {
+type OldAcceleration struct {
 	acceleration string
 	deceleration string
 	// Perhaps more parameters will go here.
@@ -15,7 +15,7 @@ type OldState struct {
 
 func SetOverrides(
 	ctx context.Context, comms CommPort, extra map[string]interface{},
-) (OldState, error) {
+) (OldAcceleration, error) {
 	var err error
 
 	// This function does the heavy lifting of writing to the device and updating err. It returns
@@ -41,13 +41,13 @@ func SetOverrides(
 		return response[3:]
 	}
 
-	var os OldState
+	var os OldAcceleration
 	os.acceleration = store("acceleration", "AC")
 	os.deceleration = store("deceleration", "DE")
 	return os, err
 }
 
-func (os *OldState) Restore(ctx context.Context, comms CommPort) error {
+func (os *OldAcceleration) Restore(ctx context.Context, comms CommPort) error {
 	// This function does all the heavy lifting of restoring the old state.
 	restore := func (command, value string) error {
 		if value == "" {

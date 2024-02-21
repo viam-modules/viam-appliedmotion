@@ -54,7 +54,12 @@ func (s *comms) Send(ctx context.Context, command string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("Sending command: %#v", command)
-	// it is 3 + len(command) because we need the 07 to start and we need to append a carriage return (\r)
+
+	// As described on page 336 of
+	// https://appliedmotion.s3.amazonaws.com/Host-Command-Reference_920-0002W_0.pdf, all packets
+	// sent either from us or to us should start with the two bytes 0x00 0x07, and end with the
+	// byte 0x0D (carriage return). The main command we send is sandwiched between them, so the
+	// buffer of data we send needs to be 3 bytes longer than the command.
 	sendBuffer := make([]byte, 3+len(command))
 	sendBuffer[0] = 0
 	sendBuffer[1] = 7
@@ -62,6 +67,7 @@ func (s *comms) Send(ctx context.Context, command string) (string, error) {
 		sendBuffer[i+2] = byte(v)
 	}
 	sendBuffer[len(sendBuffer)-1] = '\r'
+
 	s.logger.Debugf("Sending buffer: %#v", sendBuffer)
 	nWritten, err := s.handle.Write(sendBuffer)
 	if err != nil {
@@ -75,17 +81,17 @@ func (s *comms) Send(ctx context.Context, command string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	// TODO: Check the return value to see if it resulted in an error (and wrap it) or was a success
-	retString := string(readBuffer[:nRead])
+
+	// Like the packet we sent, the one we receive should start with 0x00 0x07 and end with 0x0D.
+	// We care about the part in between these.
+	if readBuffer[0] != 0x00 || readBuffer[1] != 0x07 || readBuffer[nRead-1] != 0x0D {
+		return "", fmt.Errorf("unexpected response from motor controller: %#v", readBuffer)
+	}
+
+	retString := string(readBuffer[2:nRead-1])
 	s.logger.Debugf("Response: %#v", retString)
 
-	// The response should start with 0x00 0x0a and end with 0x0D (carriage return). We only check
-	// the carriage return at the end, because it's possible that some other motor has different
-	// bytes at the beginning.
-	if retString[nRead-1] != '\r' {
-		return "", fmt.Errorf("unexpected response from motor controller: %#v", retString)
-	}
-	return retString[2:nRead-1], nil
+	return retString, nil
 }
 
 func (s *comms) Close() error {
