@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/edaniels/golog"
-	"go.viam.com/rdk/components/board"
 	"go.viam.com/rdk/components/motor"
 	"go.viam.com/rdk/resource"
 )
@@ -39,7 +38,7 @@ var ErrStatusMessageIncorrectLength = errors.New("status message incorrect lengt
 
 func init() {
 	resource.RegisterComponent(
-		board.API,
+		motor.API,
 		Model,
 		resource.Registration[motor.Motor, *Config]{Constructor: NewMotor})
 }
@@ -227,7 +226,6 @@ func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 
 	// Then actually execute the move
 	if _, err := s.comm.Send(ctx, "FL"); err != nil {
-		// If the board errors here, is it wise to potentially just leave it running?
 		return err
 	}
 	return s.waitForMoveCommandToComplete(ctx)
