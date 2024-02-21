@@ -22,8 +22,8 @@ type commPort interface {
 type comms struct {
 	mu     sync.RWMutex
 	logger golog.Logger
-	Ctx    context.Context
-	URI    string
+	ctx    context.Context
+	uri    string
 	handle io.ReadWriteCloser
 }
 
@@ -38,7 +38,7 @@ func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger go
 	if err != nil {
 		return nil, err
 	}
-	return &comms{handle: socket, URI: uri, logger: logger, mu: sync.RWMutex{}}, nil
+	return &comms{handle: socket, uri: uri, logger: logger, mu: sync.RWMutex{}}, nil
 }
 
 func newSerialComm(ctx context.Context, file string, logger golog.Logger) (*comms, error) {
@@ -46,7 +46,7 @@ func newSerialComm(ctx context.Context, file string, logger golog.Logger) (*comm
 	if fd, err := os.OpenFile(file, os.O_RDWR, fs.FileMode(os.O_RDWR)); err != nil {
 		return nil, err
 	} else {
-		return &comms{handle: fd, URI: file, logger: logger, mu: sync.RWMutex{}}, nil
+		return &comms{handle: fd, uri: file, logger: logger, mu: sync.RWMutex{}}, nil
 	}
 }
 
@@ -95,7 +95,7 @@ func (s *comms) Send(ctx context.Context, command string) (string, error) {
 }
 
 func (s *comms) Close() error {
-	s.logger.Debugf("Closing %s", s.URI)
+	s.logger.Debugf("Closing %s", s.uri)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.handle.Close()
