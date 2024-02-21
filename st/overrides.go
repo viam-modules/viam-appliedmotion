@@ -34,6 +34,8 @@ func SetOverrides(
 		response, sendErr := ReplaceValue(ctx, comms, fmt.Sprintf("%s%.3f", command, realVal))
 		err = multierr.Combine(err, sendErr)
 		if response[:3] != command + "=" {
+			// The response we got back does not match the request we sent (e.g., we sent an "AC"
+			// request but did not get an "AC=" response). Something has gone very wrong.
 			err = multierr.Combine(err, fmt.Errorf("unexpected response when storing %s: %#v",
 												   key, response))
 			return ""
