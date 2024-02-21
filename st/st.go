@@ -42,10 +42,10 @@ func init() {
 	resource.RegisterComponent(
 		motor.API,
 		Model,
-		resource.Registration[motor.Motor, *config]{Constructor: NewMotor})
+		resource.Registration[motor.Motor, *config]{Constructor: newMotor})
 }
 
-func NewMotor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger golog.Logger) (motor.Motor, error) {
+func newMotor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger golog.Logger) (motor.Motor, error) {
 	logger.Info("Starting Applied Motion Products ST Motor Driver v0.1")
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
