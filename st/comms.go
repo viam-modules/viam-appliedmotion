@@ -98,7 +98,8 @@ func (s *comms) store(ctx context.Context, command string, value float64) error 
 	if err != nil {
 		return err
 	}
-	if result != "*" {
+	// Executed commands use "%" for their ACK, and buffered commands use "*" for it.
+	if result != "%" && result != "*" {
 		return fmt.Errorf("got non-ack response when trying to set %s to %f: %s",
 		                  command, value, result)
 	}
