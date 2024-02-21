@@ -42,7 +42,7 @@ func init() {
 	resource.RegisterComponent(
 		motor.API,
 		Model,
-		resource.Registration[motor.Motor, *Config]{Constructor: NewMotor})
+		resource.Registration[motor.Motor, *config]{Constructor: NewMotor})
 }
 
 func NewMotor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger golog.Logger) (motor.Motor, error) {
@@ -68,7 +68,7 @@ func (s *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	defer s.mu.Unlock()
 	s.logger.Debug("Reconfiguring Applied Motion Products ST Motor Driver")
 
-	newConf, err := resource.NativeConfig[*Config](conf)
+	newConf, err := resource.NativeConfig[*config](conf)
 	if err != nil {
 		return err
 	}
@@ -119,7 +119,7 @@ func (s *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	return nil
 }
 
-func getComm(ctx context.Context, conf *Config, logger golog.Logger) (CommPort, error) {
+func getComm(ctx context.Context, conf *config, logger golog.Logger) (CommPort, error) {
 	switch {
 	case strings.ToLower(conf.Protocol) == "can":
 		return nil, fmt.Errorf("unsupported comm type %s", conf.Protocol)

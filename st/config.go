@@ -6,7 +6,7 @@ import (
 	"go.viam.com/rdk/utils"
 )
 
-type Config struct {
+type config struct {
 	Attributes     utils.AttributeMap `json:"attributes,omitempty"`
 	Protocol       string             `json:"protocol"`
 	URI            string             `json:"uri"`
@@ -19,7 +19,7 @@ type Config struct {
 }
 
 // Validate ensures all parts of the config are valid.
-func (conf *Config) Validate(path string) ([]string, error) {
+func (conf *config) Validate(path string) ([]string, error) {
 	if conf.Protocol == "" {
 		return nil, errors.New("protocol is required")
 	}
