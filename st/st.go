@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/edaniels/golog"
+	"go.uber.org/multierr"
 	"go.viam.com/rdk/components/motor"
 	"go.viam.com/rdk/resource"
 )
@@ -240,6 +241,11 @@ func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 	defer s.mu.Unlock()
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
 
+	oldState, err := SetOverrides(ctx, s.comm, extra)
+	if err != nil {
+		return err
+	}
+
 	// Send the configuration commands to setup the motor for the move
 	s.configureMove(ctx, positionRevolutions, rpm)
 
@@ -247,7 +253,8 @@ func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 	if _, err := s.comm.Send(ctx, "FL"); err != nil {
 		return err
 	}
-	return s.waitForMoveCommandToComplete(ctx)
+	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
+	                        oldState.Restore(ctx, s.comm))
 }
 
 func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
@@ -259,6 +266,12 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	// 	DI8000
 	// 	FP
 	s.logger.Debugf("GoTo: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
+
+	oldState, err := SetOverrides(ctx, s.comm, extra)
+	if err != nil {
+		return err
+	}
+
 	// Send the configuration commands to setup the motor for the move
 	s.configureMove(ctx, positionRevolutions, rpm)
 
@@ -266,9 +279,8 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	if _, err := s.comm.Send(ctx, "FP"); err != nil {
 		return err
 	}
-
-	// Now wait for the command to finish
-	return s.waitForMoveCommandToComplete(ctx)
+	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
+	                        oldState.Restore(ctx, s.comm))
 }
 
 func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64) error {

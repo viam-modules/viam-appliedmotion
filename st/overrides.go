@@ -58,8 +58,8 @@ func (os *OldState) Restore(ctx context.Context, comms CommPort) error {
 	}
 
 	return multierr.Combine(
-		restore("AC", os.acceleration)
-		restore("DE", os.deceleration)
+		restore("AC", os.acceleration),
+		restore("DE", os.deceleration),
 	)
 }
 
