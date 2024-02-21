@@ -77,11 +77,11 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	s.Named = conf.ResourceName().AsNamed()
 
 	// Update the min/max RPM
-	s.minRpm = newConf.MinRpm
-	s.maxRpm = newConf.MaxRpm
+	s.minRpm = newConf.minRpm
+	s.maxRpm = newConf.maxRpm
 
 	// Update the steps per rev
-	s.stepsPerRev = newConf.StepsPerRev
+	s.stepsPerRev = newConf.stepsPerRev
 
 	// If we have an old comm object, shut it down. We'll set it up again next paragraph.
 	if s.comm != nil {
@@ -95,14 +95,14 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 		s.comm = comm
 	}
 
-	s.acceleration = newConf.Acceleration
+	s.acceleration = newConf.acceleration
 	if s.acceleration > 0 {
 		if _, err := s.comm.Send(ctx, fmt.Sprintf("AC%.3f", s.acceleration)); err != nil {
 			return err
 		}
 	}
 
-	s.deceleration = newConf.Deceleration
+	s.deceleration = newConf.deceleration
 	if s.deceleration > 0 {
 		if _, err := s.comm.Send(ctx, fmt.Sprintf("DE%.3f", s.deceleration)); err != nil {
 			return err
@@ -121,24 +121,24 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 
 func getComm(ctx context.Context, conf *config, logger golog.Logger) (commPort, error) {
 	switch {
-	case strings.ToLower(conf.Protocol) == "can":
-		return nil, fmt.Errorf("unsupported comm type %s", conf.Protocol)
-	case strings.ToLower(conf.Protocol) == "ip":
+	case strings.ToLower(conf.protocol) == "can":
+		return nil, fmt.Errorf("unsupported comm type %s", conf.protocol)
+	case strings.ToLower(conf.protocol) == "ip":
 		logger.Debug("Creating IP Comm Port")
-		if conf.ConnectTimeout == 0 {
+		if conf.connectTimeout == 0 {
 			logger.Debug("Setting default connect timeout to 5 seconds")
-			conf.ConnectTimeout = 5
+			conf.connectTimeout = 5
 		}
-		timeout := time.Duration(conf.ConnectTimeout * int64(time.Second))
-		return newIpComm(ctx, conf.URI, timeout, logger)
-	case strings.ToLower(conf.Protocol) == "rs485":
+		timeout := time.Duration(conf.connectTimeout * int64(time.Second))
+		return newIpComm(ctx, conf.uri, timeout, logger)
+	case strings.ToLower(conf.protocol) == "rs485":
 		logger.Debug("Creating RS485 Comm Port")
-		return newSerialComm(ctx, conf.URI, logger)
-	case strings.ToLower(conf.Protocol) == "rs232":
+		return newSerialComm(ctx, conf.uri, logger)
+	case strings.ToLower(conf.protocol) == "rs232":
 		logger.Debug("Creating RS232 Comm Port")
-		return newSerialComm(ctx, conf.URI, logger)
+		return newSerialComm(ctx, conf.uri, logger)
 	default:
-		return nil, fmt.Errorf("unknown comm type %s", conf.Protocol)
+		return nil, fmt.Errorf("unknown comm type %s", conf.protocol)
 	}
 }
 
