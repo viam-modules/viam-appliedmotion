@@ -97,21 +97,21 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 
 	s.acceleration = newConf.acceleration
 	if s.acceleration > 0 {
-		if _, err := s.comm.send(ctx, fmt.Sprintf("AC%.3f", s.acceleration)); err != nil {
+		if err := s.comm.store(ctx, "AC", s.acceleration); err != nil {
 			return err
 		}
 	}
 
 	s.deceleration = newConf.deceleration
 	if s.deceleration > 0 {
-		if _, err := s.comm.send(ctx, fmt.Sprintf("DE%.3f", s.deceleration)); err != nil {
+		if err := s.comm.store(ctx, "DE", s.deceleration); err != nil {
 			return err
 		}
 	}
 	// Set the maximum deceleration when stopping a move in the middle, too.
 	stopDecel := math.Max(s.acceleration, s.deceleration)
 	if stopDecel > 0 {
-		if _, err := s.comm.send(ctx, fmt.Sprintf("AM%.3f", stopDecel)); err != nil {
+		if err := s.comm.store(ctx, "AM", stopDecel); err != nil {
 			return err
 		}
 	}
@@ -294,7 +294,7 @@ func (s *st) configureMove(ctx context.Context, positionRevolutions, rpm float64
 	}
 
 	// Now set the velocity
-	if _, err := s.comm.send(ctx, fmt.Sprintf("VE%.4f", revSec)); err != nil {
+	if err := s.comm.store(ctx, "VE", revSec); err != nil {
 		return err
 	}
 
