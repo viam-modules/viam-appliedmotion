@@ -241,7 +241,7 @@ func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 	defer s.mu.Unlock()
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
 
-	oldAcceleration, err := SetOverrides(ctx, s.comm, extra)
+	oldAcceleration, err := setOverrides(ctx, s.comm, extra)
 	if err != nil {
 		return err
 	}
@@ -254,7 +254,7 @@ func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 		return err
 	}
 	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
-	                        oldAcceleration.Restore(ctx, s.comm))
+	                        oldAcceleration.restore(ctx, s.comm))
 }
 
 func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
@@ -267,7 +267,7 @@ func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	// 	FP
 	s.logger.Debugf("GoTo: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
 
-	oldAcceleration, err := SetOverrides(ctx, s.comm, extra)
+	oldAcceleration, err := setOverrides(ctx, s.comm, extra)
 	if err != nil {
 		return err
 	}
@@ -280,7 +280,7 @@ func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 		return err
 	}
 	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
-	                        oldAcceleration.Restore(ctx, s.comm))
+	                        oldAcceleration.restore(ctx, s.comm))
 }
 
 func (s *st) configureMove(ctx context.Context, positionRevolutions, rpm float64) error {
