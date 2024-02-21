@@ -25,7 +25,7 @@ type st struct {
 	logger       golog.Logger
 	cancelCtx    context.Context
 	cancelFunc   func()
-	comm         CommPort
+	comm         commPort
 	minRpm       float64
 	maxRpm       float64
 	acceleration float64
@@ -119,7 +119,7 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	return nil
 }
 
-func getComm(ctx context.Context, conf *config, logger golog.Logger) (CommPort, error) {
+func getComm(ctx context.Context, conf *config, logger golog.Logger) (commPort, error) {
 	switch {
 	case strings.ToLower(conf.Protocol) == "can":
 		return nil, fmt.Errorf("unsupported comm type %s", conf.Protocol)

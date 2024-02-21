@@ -14,7 +14,7 @@ import (
 	"github.com/edaniels/golog"
 )
 
-type CommPort interface {
+type commPort interface {
 	Send(ctx context.Context, command string) (string, error)
 	Close() error
 }

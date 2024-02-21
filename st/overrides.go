@@ -14,7 +14,7 @@ type oldAcceleration struct {
 }
 
 func setOverrides(
-	ctx context.Context, comms CommPort, extra map[string]interface{},
+	ctx context.Context, comms commPort, extra map[string]interface{},
 ) (oldAcceleration, error) {
 	var err error
 
@@ -49,7 +49,7 @@ func setOverrides(
 	return os, err
 }
 
-func (os *oldAcceleration) restore(ctx context.Context, comms CommPort) error {
+func (os *oldAcceleration) restore(ctx context.Context, comms commPort) error {
 	// This function does all the heavy lifting of restoring the old state.
 	restore := func (command, value string) error {
 		if value == "" {
@@ -65,13 +65,13 @@ func (os *oldAcceleration) restore(ctx context.Context, comms CommPort) error {
 	)
 }
 
-// replaceValue first sends on the CommPort a version of the command with no arguments, then the
+// replaceValue first sends on the commPort a version of the command with no arguments, then the
 // entire command, and returns what it received from the first one. It is intended to be used to
 // temporarily override some state in the motor controller.
 // Example use: ReplaceValue(s, "AC100") sets the acceleration to 100 revs/sec^2 and returns the
 // previous acceleration value. Later, you can use that return value to restore the acceleration to
 // its original setting.
-func replaceValue(ctx context.Context, s CommPort, command string) (string, error) {
+func replaceValue(ctx context.Context, s commPort, command string) (string, error) {
 	response, err := s.Send(ctx, command[:2])
 	if err != nil {
 		return "", err
