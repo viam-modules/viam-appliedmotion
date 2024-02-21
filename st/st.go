@@ -394,8 +394,6 @@ func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 
 // Stop implements motor.Motor.
 func (s *ST) Stop(ctx context.Context, extras map[string]interface{}) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	// SK - Stop & Kill? Stops and erases queue
 	// SM - Stop Move? Stops and leaves queue intact?
 	// ST - Halts the current buffered command being executed, but does not affect other buffered commands in the command buffer
