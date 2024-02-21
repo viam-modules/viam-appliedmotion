@@ -15,26 +15,26 @@ import (
 
 var StepsPerRev = int64(20000)
 
-func getMotorForTesting(t *testing.T) (context.Context, *ST, error) {
+func getMotorForTesting(t *testing.T) (context.Context, *st, error) {
 	ctx := context.TODO()
 	logger := golog.NewTestLogger(t)
 	logger.WithOptions()
 	config := resource.Config{
-		ConvertedAttributes: &Config{
-			URI:            "10.10.10.10:7776",
-			Protocol:       "ip",
-			MinRpm:         0,
-			MaxRpm:         900,
-			ConnectTimeout: 1,
-			StepsPerRev:    StepsPerRev,
-			Acceleration:   100,
-			Deceleration:   100,
+		ConvertedAttributes: &config{
+			uri:            "10.10.10.10:7776",
+			protocol:       "ip",
+			minRpm:         0,
+			maxRpm:         900,
+			connectTimeout: 1,
+			stepsPerRev:    StepsPerRev,
+			acceleration:   100,
+			deceleration:   100,
 		},
 	}
-	m, e := NewMotor(ctx, nil, config, logger)
+	m, e := newMotor(ctx, nil, config, logger)
 
-	// unwrap motor.Motor into ST so we can access some non-interface members
-	st, _ := m.(*ST)
+	// unwrap motor.Motor into st so we can access some non-interface members
+	st, _ := m.(*st)
 	return ctx, st, e
 }
 
@@ -173,10 +173,10 @@ func TestAccelOverrides(t *testing.T) {
 	err = motor.GoFor(ctx, 600, 5, nil)
 	assert.Nil(t, err, "error moving motor at default acceleration")
 	t2 := time.Now()
-	err = motor.GoFor(ctx, 600, 5, map[string]interface{}{"acceleration": float32(10)})
+	err = motor.GoFor(ctx, 600, 5, map[string]interface{}{"acceleration": 10.0})
 	assert.Nil(t, err, "error moving motor at slower acceleration")
 	t3 := time.Now()
-	err = motor.GoFor(ctx, 600, 5, map[string]interface{}{"deceleration": float32(10)})
+	err = motor.GoFor(ctx, 600, 5, map[string]interface{}{"deceleration": 10.0})
 	assert.Nil(t, err, "error moving motor at slower deceleration")
 	t4 := time.Now()
 
