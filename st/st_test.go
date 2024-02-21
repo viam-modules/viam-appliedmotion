@@ -163,3 +163,23 @@ func TestDoCommand(t *testing.T) {
 	assert.Nil(t, err, "error executing do command")
 	assert.NotNil(t, resp["response"], "response should not be nil")
 }
+
+func TestAccelOverrides(t *testing.T) {
+	ctx, motor, err := getMotorForTesting(t)
+	assert.Nil(t, err, "failed to construct motor")
+
+	// Since we're moving a real motor, we can use real time to see how fast it's going.
+	t1 := time.Now()
+	err = motor.GoFor(ctx, 600, 5, nil)
+	assert.Nil(t, err, "error moving motor at default acceleration")
+	t2 := time.Now()
+	err = motor.GoFor(ctx, 600, 5, map[string]interface{}{"acceleration": float32(10)})
+	assert.Nil(t, err, "error moving motor at slower acceleration")
+	t3 := time.Now()
+	err = motor.GoFor(ctx, 600, 5, map[string]interface{}{"deceleration": float32(10)})
+	assert.Nil(t, err, "error moving motor at slower deceleration")
+	t4 := time.Now()
+
+	assert.Greater(t, t3.Sub(t2), 2 * t1.Sub(t2)) // Slow acceleration takes longer than default
+	assert.Greater(t, t4.Sub(t3), 2 * t1.Sub(t2)) // Slow deceleration takes longer than default, too
+}
