@@ -5,13 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/edaniels/golog"
-	"go.viam.com/rdk/components/board"
 	"go.viam.com/rdk/components/motor"
 	"go.viam.com/rdk/resource"
 )
@@ -39,7 +39,7 @@ var ErrStatusMessageIncorrectLength = errors.New("status message incorrect lengt
 
 func init() {
 	resource.RegisterComponent(
-		board.API,
+		motor.API,
 		Model,
 		resource.Registration[motor.Motor, *Config]{Constructor: NewMotor})
 }
@@ -227,7 +227,6 @@ func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 
 	// Then actually execute the move
 	if _, err := s.comm.Send(ctx, "FL"); err != nil {
-		// If the board errors here, is it wise to potentially just leave it running?
 		return err
 	}
 	return s.waitForMoveCommandToComplete(ctx)
@@ -281,6 +280,14 @@ func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64
 			return err
 		}
 	}
+	// Set the maximum deceleration when stopping a move in the middle, too.
+	stopDecel := math.Max(s.acceleration, s.deceleration)
+	if stopDecel > 0 {
+		if _, err := s.comm.Send(ctx, fmt.Sprintf("AM%.3f", stopDecel)); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -396,13 +403,11 @@ func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 
 // Stop implements motor.Motor.
 func (s *ST) Stop(ctx context.Context, extras map[string]interface{}) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	// SK - Stop & Kill? Stops and erases queue
 	// SM - Stop Move? Stops and leaves queue intact?
 	// ST - Halts the current buffered command being executed, but does not affect other buffered commands in the command buffer
 	s.logger.Debugf("Stop called with %v", extras)
-	_, err := s.comm.Send(ctx, "SC")
+	_, err := s.comm.Send(ctx, "SK") // Stop the current move and clear any queued moves, too.
 	if err != nil {
 		return err
 	}
