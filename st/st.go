@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -279,6 +280,14 @@ func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64
 			return err
 		}
 	}
+	// Set the maximum deceleration when stopping a move in the middle, too.
+	stopDecel := math.Max(s.acceleration, s.deceleration)
+	if stopDecel > 0 {
+		if _, err := s.comm.Send(ctx, fmt.Sprintf("AM%.3f", stopDecel)); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -398,7 +407,7 @@ func (s *ST) Stop(ctx context.Context, extras map[string]interface{}) error {
 	// SM - Stop Move? Stops and leaves queue intact?
 	// ST - Halts the current buffered command being executed, but does not affect other buffered commands in the command buffer
 	s.logger.Debugf("Stop called with %v", extras)
-	_, err := s.comm.Send(ctx, "SC")
+	_, err := s.comm.Send(ctx, "SK") // Stop the current move and clear any queued moves, too.
 	if err != nil {
 		return err
 	}
