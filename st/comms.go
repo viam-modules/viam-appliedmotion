@@ -91,6 +91,20 @@ func (s *comms) send(ctx context.Context, command string) (string, error) {
 	return retString, nil
 }
 
+func (s *comms) store(ctx context.Context, command string, value float64) error {
+	// Many commands can only handle 3 digits of precision, but some can handle 4 and the
+	// controller will round to the nearest value it can handle anyway.
+	result, err := s.send(ctx, fmt.Sprintf("%s%.4f", command, value))
+	if err != nil {
+		return err
+	}
+	if result != "*" {
+		return fmt.Errorf("got non-ack response when trying to set %s to %f: %s",
+		                  command, value, result)
+	}
+	return nil
+}
+
 func (s *comms) Close() error {
 	s.logger.Debugf("Closing %s", s.uri)
 	s.mu.Lock()
