@@ -29,7 +29,7 @@ func setOverrides(
 
 		realVal, ok := val.(float64)
 		if !ok {
-			err = multierr.Combine(err, fmt.Errorf("malformed value for %s: %#v", key, val))
+			err = multierr.Combine(err, fmt.Errorf("non-float64 value for %s: %#v", key, val))
 			return 0.0
 		}
 		response, sendErr := replaceValue(ctx, comms, command, realVal)
