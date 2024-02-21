@@ -19,7 +19,7 @@ import (
 
 var Model = resource.NewModel("viam-labs", "appliedmotion", "st")
 
-type ST struct {
+type st struct {
 	resource.Named
 	mu           sync.RWMutex
 	logger       golog.Logger
@@ -49,7 +49,7 @@ func NewMotor(ctx context.Context, deps resource.Dependencies, conf resource.Con
 	logger.Info("Starting Applied Motion Products ST Motor Driver v0.1")
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
-	s := ST{
+	s := st{
 		Named:      conf.ResourceName().AsNamed(),
 		logger:     logger,
 		cancelCtx:  cancelCtx,
@@ -63,7 +63,7 @@ func NewMotor(ctx context.Context, deps resource.Dependencies, conf resource.Con
 	return &s, nil
 }
 
-func (s *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf resource.Config) error {
+func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf resource.Config) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debug("Reconfiguring Applied Motion Products ST Motor Driver")
@@ -142,7 +142,7 @@ func getComm(ctx context.Context, conf *config, logger golog.Logger) (CommPort, 
 	}
 }
 
-func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
+func (s *st) getStatus(ctx context.Context) ([]byte, error) {
 	if resp, err := s.comm.Send(ctx, "SC"); err != nil {
 		return nil, err
 	} else {
@@ -178,7 +178,7 @@ func inPosition(status []byte) (bool, error) {
 	return (status[1]>>3)&1 == 1, nil
 }
 
-func (s *ST) getBufferStatus(ctx context.Context) (int, error) {
+func (s *st) getBufferStatus(ctx context.Context) (int, error) {
 	if resp, err := s.comm.Send(ctx, "BS"); err != nil {
 		return -1, err
 	} else {
@@ -202,7 +202,7 @@ func (s *ST) getBufferStatus(ctx context.Context) (int, error) {
 	}
 }
 
-func (s *ST) waitForMoveCommandToComplete(ctx context.Context) error {
+func (s *st) waitForMoveCommandToComplete(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -223,12 +223,12 @@ func (s *ST) waitForMoveCommandToComplete(ctx context.Context) error {
 	}
 }
 
-func (s *ST) isBufferEmpty(ctx context.Context) (bool, error) {
+func (s *st) isBufferEmpty(ctx context.Context) (bool, error) {
 	b, e := s.getBufferStatus(ctx)
 	return b == 63, e
 }
 
-func (s *ST) Close(ctx context.Context) error {
+func (s *st) Close(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -236,7 +236,7 @@ func (s *ST) Close(ctx context.Context) error {
 	return s.comm.Close()
 }
 
-func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
+func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
@@ -257,7 +257,7 @@ func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 	                        oldAcceleration.Restore(ctx, s.comm))
 }
 
-func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
+func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// FP?
@@ -283,7 +283,7 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	                        oldAcceleration.Restore(ctx, s.comm))
 }
 
-func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64) error {
+func (s *st) configureMove(ctx context.Context, positionRevolutions, rpm float64) error {
 	// need to convert from RPM to revs per second
 	revSec := rpm / 60
 	// need to convert from revs to steps
@@ -301,7 +301,7 @@ func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64
 	return nil
 }
 
-func (s *ST) IsMoving(ctx context.Context) (bool, error) {
+func (s *st) IsMoving(ctx context.Context) (bool, error) {
 	// If we locked the mutex, we'd block until after any GoFor or GoTo commands were finished! We
 	// also aren't mutating any state in the struct itself, so there is no need to lock it.
 	s.logger.Debug("IsMoving")
@@ -317,7 +317,7 @@ func (s *ST) IsMoving(ctx context.Context) (bool, error) {
 }
 
 // IsPowered implements motor.Motor.
-func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool, float64, error) {
+func (s *st) IsPowered(ctx context.Context, extra map[string]interface{}) (bool, float64, error) {
 	// The same as IsMoving, don't lock the mutex.
 	s.logger.Debugf("IsPowered: extra=%v", extra)
 	status, err := s.getStatus(ctx)
@@ -334,7 +334,7 @@ func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool,
 }
 
 // Position implements motor.Motor.
-func (s *ST) Position(ctx context.Context, extra map[string]interface{}) (float64, error) {
+func (s *st) Position(ctx context.Context, extra map[string]interface{}) (float64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("Position: extra=%v", extra)
@@ -358,12 +358,12 @@ func (s *ST) Position(ctx context.Context, extra map[string]interface{}) (float6
 }
 
 // Properties implements motor.Motor.
-func (s *ST) Properties(ctx context.Context, extra map[string]interface{}) (motor.Properties, error) {
+func (s *st) Properties(ctx context.Context, extra map[string]interface{}) (motor.Properties, error) {
 	return motor.Properties{PositionReporting: true}, nil
 }
 
 // ResetZeroPosition implements motor.Motor.
-func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[string]interface{}) error {
+func (s *st) ResetZeroPosition(ctx context.Context, offset float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// The docs seem to indicate that for proper reset to 0, you must send both EP0 and SP0
@@ -382,7 +382,7 @@ func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 }
 
 // SetPower implements motor.Motor.
-func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
+func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
 	// We could tell it to move at a certain speed for a very large number of rotations, but that's
 	// as close as this motor gets to having a "set power" function. A sketch of that
 	// implementation is commented out below.
@@ -408,7 +408,7 @@ func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 }
 
 // Stop implements motor.Motor.
-func (s *ST) Stop(ctx context.Context, extras map[string]interface{}) error {
+func (s *st) Stop(ctx context.Context, extras map[string]interface{}) error {
 	// SK - Stop & Kill? Stops and erases queue
 	// SM - Stop Move? Stops and leaves queue intact?
 	// ST - Halts the current buffered command being executed, but does not affect other buffered commands in the command buffer
@@ -420,7 +420,7 @@ func (s *ST) Stop(ctx context.Context, extras map[string]interface{}) error {
 	return nil
 }
 
-func (s *ST) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
+func (s *st) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debug("DoCommand called with %v", cmd)
