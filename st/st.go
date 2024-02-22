@@ -338,9 +338,10 @@ func (s *st) Position(ctx context.Context, extra map[string]interface{}) (float6
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("Position: extra=%v", extra)
-	// EP?
-	// IP?
-	// The response should look something like IP=<num>\r
+
+	// Use EP if we've got an encoder plugged in (this struct currently doesn't support that).
+	// Use IP if we don't have an encoder and want to just count steps.
+	// The response should look something like IP=<num>
 	if resp, err := s.comm.send(ctx, "IP"); err != nil {
 		return 0, err
 	} else {
@@ -366,15 +367,24 @@ func (s *st) Properties(ctx context.Context, extra map[string]interface{}) (moto
 func (s *st) ResetZeroPosition(ctx context.Context, offset float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// The docs seem to indicate that for proper reset to 0, you must send both EP0 and SP0
 	s.logger.Debugf("ResetZeroPosition: offset=%v", offset)
+
+	// The driver only has 32 bits of precision. If we go beyond that, we're gonna have a bad time.
+	newCurrentPosition := int32(-offset * s.stepsPerRev)
+
+	// The docs indicate that for proper reset, you must send both EP and SP. The EP is only
+	// important if we've got an encoder plugged in, though we currently don't support that. If we
+	// do start supporting an encoder, we should also use the CI and CC commands to increase the
+	// current going to the motor while the encoder is being reset, so the motor can't wiggle
+	// around during the reset.
+
 	// First reset the encoder
-	if _, err := s.comm.send(ctx, "EP0"); err != nil {
+	if _, err := s.comm.send(ctx, fmt.Sprintf("EP%d", newCurrentPosition)); err != nil {
 		return err
 	}
 
 	// Then reset the internal position
-	if _, err := s.comm.send(ctx, "SP0"); err != nil {
+	if _, err := s.comm.send(ctx, fmt.Sprintf("SP%d", newCurrentPosition)); err != nil {
 		return err
 	}
 
