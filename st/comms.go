@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/edaniels/golog"
+	"go.uber.org/multierr"
 )
 
 type commPort = *comms
@@ -22,28 +23,43 @@ type comms struct {
 	ctx    context.Context
 	uri    string
 	handle io.ReadWriteCloser
+
+	// Sometimes the IP-based motor controllers lose their connection, and we need to make it again.
+	reconnect func() (io.ReadWriteCloser, error)
 }
 
 func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger golog.Logger) (commPort, error) {
-	logger.Debugf("Dialing %s", uri)
-	d := net.Dialer{
-		Timeout:   timeout,
-		KeepAlive: 1 * time.Second,
-		Deadline:  time.Now().Add(timeout),
+	reconnect := func() (io.ReadWriteCloser, error) {
+		logger.Debugf("Dialing %s", uri)
+		d := net.Dialer{
+			Timeout:   timeout,
+			KeepAlive: 1 * time.Second,
+			Deadline:  time.Now().Add(timeout),
+		}
+		socket, err := d.DialContext(ctx, "tcp", uri)
+		if err != nil {
+			return nil, err
+		}
+		return socket, nil
 	}
-	socket, err := d.DialContext(ctx, "tcp", uri)
-	if err != nil {
+
+	if socket, err := reconnect(); err != nil {
 		return nil, err
+	} else {
+		return &comms{handle: socket, URI: uri, logger: logger, reconnect: reconnect}, nil
 	}
-	return &comms{handle: socket, uri: uri, logger: logger, mu: sync.RWMutex{}}, nil
 }
 
 func newSerialComm(ctx context.Context, file string, logger golog.Logger) (commPort, error) {
-	logger.Debugf("Opening %s", file)
-	if fd, err := os.OpenFile(file, os.O_RDWR, fs.FileMode(os.O_RDWR)); err != nil {
+	reconnect := func() (io.ReadWriteCloser, error) {
+		logger.Debugf("Opening %s", file)
+		return os.OpenFile(file, os.O_RDWR, fs.FileMode(os.O_RDWR))
+	}
+
+	if fd, err := reconnect(); err != nil {
 		return nil, err
 	} else {
-		return &comms{handle: fd, uri: file, logger: logger, mu: sync.RWMutex{}}, nil
+		return &comms{handle: fd, URI: file, logger: logger, reconnect: reconnect}, nil
 	}
 }
 
@@ -68,7 +84,21 @@ func (s *comms) send(ctx context.Context, command string) (string, error) {
 	s.logger.Debugf("Sending buffer: %#v", sendBuffer)
 	nWritten, err := s.handle.Write(sendBuffer)
 	if err != nil {
-		return "", err
+		// After a long period of inactivity, our connection might have gotten stale. Try
+		// reconnecting and sending the buffer one more time, but give up if that doesn't help.
+		err = multierr.Combine(err, s.handle.Close())
+		handle, reconnectErr := s.reconnect()
+		if reconnectErr != nil {
+			return "", multierr.Combine(err, reconnectErr)
+		}
+		s.handle = handle
+
+		// Update the previous nWritten when we retry writing.
+		var secondErr error
+		nWritten, secondErr = s.handle.Write(sendBuffer)
+		if err != nil {
+			return "", multierr.Combine(err, secondErr)
+		}
 	}
 	if nWritten != 3+len(command) {
 		return "", errors.New("failed to write all bytes")
