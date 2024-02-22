@@ -353,7 +353,10 @@ func (s *st) Position(ctx context.Context, extra map[string]interface{}) (float6
 		if val, err := strconv.ParseUint(resp, 16, 32); err != nil {
 			return 0, err
 		} else {
-			return float64(val), nil
+			// We parsed the value as though it was unsigned, but it's really signed. We can't
+			// parse it as signed originally because strconv expects the sign to be indicated by a
+			// "-" at the beginning, not by the most significant bit in the word. Convert it here.
+			return float64(int32(val)), nil
 		}
 	}
 }
@@ -370,7 +373,7 @@ func (s *st) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 	s.logger.Debugf("ResetZeroPosition: offset=%v", offset)
 
 	// The driver only has 32 bits of precision. If we go beyond that, we're gonna have a bad time.
-	newCurrentPosition := int32(-offset * s.stepsPerRev)
+	newCurrentPosition := int32(-offset * float64(s.stepsPerRev))
 
 	// The docs indicate that for proper reset, you must send both EP and SP. The EP is only
 	// important if we've got an encoder plugged in, though we currently don't support that. If we

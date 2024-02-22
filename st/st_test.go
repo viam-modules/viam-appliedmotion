@@ -146,6 +146,21 @@ func TestPosition(t *testing.T) {
 	assert.Nil(t, err, "error getting position")
 	expectedSteps = 0
 	assert.Equal(t, expectedSteps, position, "position should be equal to %v", expectedSteps)
+
+	// Reset the position to a nonzero value
+	err = motor.ResetZeroPosition(ctx, 1, nil)
+	assert.Nil(t, err, "error resetting position")
+
+	position, err = motor.Position(ctx, nil)
+	assert.Nil(t, err, "error getting position")
+	assert.Equal(t, float64(-StepsPerRev), position)
+
+	err = motor.GoFor(ctx, 600, 1, nil)
+	assert.Nil(t, err, "error executing move command")
+
+	position, err = motor.Position(ctx, nil)
+	assert.Nil(t, err, "error getting position")
+	assert.Equal(t, 0.0, position)
 }
 
 func TestDoCommand(t *testing.T) {
