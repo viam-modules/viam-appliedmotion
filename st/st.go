@@ -364,6 +364,7 @@ func (s *st) Properties(ctx context.Context, extra map[string]interface{}) (moto
 
 // ResetZeroPosition implements motor.Motor.
 func (s *st) ResetZeroPosition(ctx context.Context, offset float64, extra map[string]interface{}) error {
+	// TODO: use the offset for something.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// The docs seem to indicate that for proper reset to 0, you must send both EP0 and SP0
