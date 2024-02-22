@@ -35,3 +35,7 @@ Support has been explicity tested on the STF10-IP, and support for RS485 has bee
 | deceleration* | float64 | The acceleration rate to use for the end of move commands and explicit stop commands |
 
 _*Denotes configuration value is optional_
+
+## Network Setup (for ethernet-connected motor controllers like the STF10-IP)
+
+Assuming you set the dial on the side of the controller to a static IP address such as 10.10.10.10, you will need to configure your computer to know where to find it. On your computer, go to the settings for the ethernet device to which the motor controller is connected. In the IPv4 settings, set the method for obtaining an IP address to Manual (rather than, for example, DHCP). Add the address 10.10.10.1 with a netmask of 24, which instructs the computer to look for all addresses in the 10.10.10.xx on that ethernet port, while still looking for all other traffic on other network connections. Save and close these settings.
