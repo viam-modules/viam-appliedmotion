@@ -93,6 +93,18 @@ func (s *comms) send(ctx context.Context, command string) (string, error) {
 		}
 		s.handle = handle
 
+		// Something in here can get the requests and responses out of sync with each other. Read
+		// from the new handle until we no longer get responses, so we've got a fresh start.
+		readBuffer := make([]byte, 1024)
+		nRead := 1
+		var readErr error
+		for nRead != 0 {
+			nRead, readErr = s.handle.Read(readBuffer)
+			if readErr != nil { // Something else has gone wrong
+				return "", multierr.Combine(err, readErr)
+			}
+		}
+
 		// Update the previous nWritten when we retry writing.
 		var secondErr error
 		nWritten, secondErr = s.handle.Write(sendBuffer)
