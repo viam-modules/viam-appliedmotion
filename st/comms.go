@@ -107,6 +107,7 @@ func (s *comms) send(ctx context.Context, command string) (string, error) {
 			if readErr != nil { // Something else has gone wrong
 				return "", multierr.Combine(err, readErr)
 			}
+			s.logger.Debugf("Flushing %d bytes from buffer during reconnect: %v", nRead, readBuffer[:nRead])
 		}
 
 		// It's possible that timing out, reconnecting, and flushing the responses has taken so
