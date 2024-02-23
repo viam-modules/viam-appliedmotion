@@ -108,7 +108,5 @@ func (s *comms) store(ctx context.Context, command string, value float64) error 
 
 func (s *comms) Close() error {
 	s.logger.Debugf("Closing %s", s.uri)
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	return s.handle.Close()
 }
