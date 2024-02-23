@@ -13,22 +13,22 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
-var StepsPerRev = int64(20000)
+const stepsPerRev = 20000
 
 func getMotorForTesting(t *testing.T) (context.Context, *st, error) {
 	ctx := context.TODO()
 	logger := golog.NewTestLogger(t)
 	logger.WithOptions()
 	config := resource.Config{
-		ConvertedAttributes: &config{
-			uri:            "10.10.10.10:7776",
-			protocol:       "ip",
-			minRpm:         0,
-			maxRpm:         900,
-			connectTimeout: 1,
-			stepsPerRev:    StepsPerRev,
-			acceleration:   100,
-			deceleration:   100,
+		ConvertedAttributes: &Config{
+			Uri:            "10.10.10.10:7776",
+			Protocol:       "ip",
+			MinRpm:         0,
+			MaxRpm:         900,
+			ConnectTimeout: 1,
+			StepsPerRev:    stepsPerRev,
+			Acceleration:   100,
+			Deceleration:   100,
 		},
 	}
 	m, e := newMotor(ctx, nil, config, logger)
@@ -103,7 +103,7 @@ func TestGoTo(t *testing.T) {
 
 	position, err := motor.Position(ctx, nil)
 	assert.Nil(t, err, "error getting position")
-	expectedSteps := float64(StepsPerRev) * .001
+	expectedSteps := .001
 	assert.Equal(t, expectedSteps, position, "position should be equal to %v", expectedSteps)
 
 	err = motor.GoTo(ctx, 100, .01, nil)
@@ -111,7 +111,7 @@ func TestGoTo(t *testing.T) {
 
 	position, err = motor.Position(ctx, nil)
 	assert.Nil(t, err, "error getting position")
-	expectedSteps = float64(StepsPerRev) * .01
+	expectedSteps = .01
 	assert.Equal(t, expectedSteps, position, "position should be equal to %v", expectedSteps)
 }
 
@@ -135,7 +135,7 @@ func TestPosition(t *testing.T) {
 	// Check the position again
 	position, err = motor.Position(ctx, nil)
 	assert.Nil(t, err, "error getting position")
-	expectedSteps := float64(StepsPerRev) * distance
+	expectedSteps := .01
 	assert.Equal(t, expectedSteps, position, "position should be equal to %v", expectedSteps)
 
 	// Move the motor a bit, but this time, backwards

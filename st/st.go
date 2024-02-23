@@ -42,7 +42,7 @@ func init() {
 	resource.RegisterComponent(
 		motor.API,
 		Model,
-		resource.Registration[motor.Motor, *config]{Constructor: newMotor})
+		resource.Registration[motor.Motor, *Config]{Constructor: newMotor})
 }
 
 func newMotor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger golog.Logger) (motor.Motor, error) {
@@ -68,7 +68,7 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	defer s.mu.Unlock()
 	s.logger.Debug("Reconfiguring Applied Motion Products ST Motor Driver")
 
-	newConf, err := resource.NativeConfig[*config](conf)
+	newConf, err := resource.NativeConfig[*Config](conf)
 	if err != nil {
 		return err
 	}
@@ -77,11 +77,11 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	s.Named = conf.ResourceName().AsNamed()
 
 	// Update the min/max RPM
-	s.minRpm = newConf.minRpm
-	s.maxRpm = newConf.maxRpm
+	s.minRpm = newConf.MinRpm
+	s.maxRpm = newConf.MaxRpm
 
 	// Update the steps per rev
-	s.stepsPerRev = newConf.stepsPerRev
+	s.stepsPerRev = newConf.StepsPerRev
 
 	// If we have an old comm object, shut it down. We'll set it up again next paragraph.
 	if s.comm != nil {
@@ -95,14 +95,14 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 		s.comm = comm
 	}
 
-	s.acceleration = newConf.acceleration
+	s.acceleration = newConf.Acceleration
 	if s.acceleration > 0 {
 		if err := s.comm.store(ctx, "AC", s.acceleration); err != nil {
 			return err
 		}
 	}
 
-	s.deceleration = newConf.deceleration
+	s.deceleration = newConf.Deceleration
 	if s.deceleration > 0 {
 		if err := s.comm.store(ctx, "DE", s.deceleration); err != nil {
 			return err
@@ -119,26 +119,26 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	return nil
 }
 
-func getComm(ctx context.Context, conf *config, logger golog.Logger) (commPort, error) {
+func getComm(ctx context.Context, conf *Config, logger golog.Logger) (commPort, error) {
 	switch {
-	case strings.ToLower(conf.protocol) == "can":
-		return nil, fmt.Errorf("unsupported comm type %s", conf.protocol)
-	case strings.ToLower(conf.protocol) == "ip":
+	case strings.ToLower(conf.Protocol) == "can":
+		return nil, fmt.Errorf("unsupported comm type %s", conf.Protocol)
+	case strings.ToLower(conf.Protocol) == "ip":
 		logger.Debug("Creating IP Comm Port")
-		if conf.connectTimeout == 0 {
+		if conf.ConnectTimeout == 0 {
 			logger.Debug("Setting default connect timeout to 5 seconds")
-			conf.connectTimeout = 5
+			conf.ConnectTimeout = 5
 		}
-		timeout := time.Duration(conf.connectTimeout * int64(time.Second))
-		return newIpComm(ctx, conf.uri, timeout, logger)
-	case strings.ToLower(conf.protocol) == "rs485":
+		timeout := time.Duration(conf.ConnectTimeout * int64(time.Second))
+		return newIpComm(ctx, conf.Uri, timeout, logger)
+	case strings.ToLower(conf.Protocol) == "rs485":
 		logger.Debug("Creating RS485 Comm Port")
-		return newSerialComm(ctx, conf.uri, logger)
-	case strings.ToLower(conf.protocol) == "rs232":
+		return newSerialComm(ctx, conf.Uri, logger)
+	case strings.ToLower(conf.Protocol) == "rs232":
 		logger.Debug("Creating RS232 Comm Port")
-		return newSerialComm(ctx, conf.uri, logger)
+		return newSerialComm(ctx, conf.Uri, logger)
 	default:
-		return nil, fmt.Errorf("unknown comm type %s", conf.protocol)
+		return nil, fmt.Errorf("unknown comm type %s", conf.Protocol)
 	}
 }
 
@@ -206,7 +206,12 @@ func (s *st) waitForMoveCommandToComplete(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return errors.New("context cancelled")
+			// We need to stop the hardware when our context is canceled. Sending the stop needs a
+			// non-canceled context, and we cannot use ctx since that has already been canceled.
+			// Fortunately, stopping should be very fast and not block, so it's alright to use the
+			// background context for this.
+			s.Stop(context.Background(), nil)
+			return ctx.Err()
 		case <-time.After(100 * time.Millisecond):
 		}
 		if bufferIsEmpty, err := s.isBufferEmpty(ctx); err != nil {
@@ -363,7 +368,7 @@ func (s *st) Position(ctx context.Context, extra map[string]interface{}) (float6
 			// We parsed the value as though it was unsigned, but it's really signed. We can't
 			// parse it as signed originally because strconv expects the sign to be indicated by a
 			// "-" at the beginning, not by the most significant bit in the word. Convert it here.
-			return float64(int32(val)), nil
+			return float64(int32(val))/float64(s.stepsPerRev), nil
 		}
 	}
 }
