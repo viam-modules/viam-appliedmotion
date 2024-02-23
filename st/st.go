@@ -206,9 +206,10 @@ func (s *st) waitForMoveCommandToComplete(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			// Our context is canceled, so we need to stop the motor. but we need a non-canceled
-			// context to do that. Fortunately, stopping should be very fast and not block, so it's
-			// alright to use a context that cannot be canceled.
+			// We need to stop the hardware when our context is canceled. Sending the stop needs a
+			// non-canceled context, and we cannot use ctx since that has already been canceled.
+			// Fortunately, stopping should be very fast and not block, so it's alright to use the
+			// background context for this.
 			s.Stop(context.Background(), nil)
 			return ctx.Err()
 		case <-time.After(100 * time.Millisecond):
