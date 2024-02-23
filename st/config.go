@@ -6,36 +6,36 @@ import (
 	"go.viam.com/rdk/utils"
 )
 
-type config struct {
-	attributes     utils.AttributeMap `json:"attributes,omitempty"`
-	protocol       string             `json:"protocol"`
-	uri            string             `json:"uri"`
-	minRpm         float64            `json:"min_rpm"`
-	maxRpm         float64            `json:"max_rpm"`
-	stepsPerRev    int64              `json:"steps_per_rev"`
-	connectTimeout int64              `json:"connect_timeout,omitempty"`
-	acceleration   float64            `json:"acceleration,omitempty"`
-	deceleration   float64            `json:"deceleration,omitempty"`
+type Config struct {
+	Attributes     utils.AttributeMap `json:"attributes,omitempty"`
+	Protocol       string             `json:"protocol"`
+	Uri            string             `json:"uri"`
+	MinRpm         float64            `json:"min_rpm"`
+	MaxRpm         float64            `json:"max_rpm"`
+	StepsPerRev    int64              `json:"steps_per_rev"`
+	ConnectTimeout int64              `json:"connect_timeout,omitempty"`
+	Acceleration   float64            `json:"acceleration,omitempty"`
+	Deceleration   float64            `json:"deceleration,omitempty"`
 }
 
 // Validate ensures all parts of the config are valid.
-func (conf *config) Validate(path string) ([]string, error) {
-	if conf.protocol == "" {
+func (conf *Config) Validate(path string) ([]string, error) {
+	if conf.Protocol == "" {
 		return nil, errors.New("protocol is required")
 	}
-	if conf.uri == "" {
+	if conf.Uri == "" {
 		return nil, errors.New("URI is required")
 	}
-	if conf.minRpm < 0 {
+	if conf.MinRpm < 0 {
 		return nil, errors.New("min_rpm must be >= 0")
 	}
-	if conf.maxRpm <= 0 {
+	if conf.MaxRpm <= 0 {
 		return nil, errors.New("max_rpm must be > 0")
 	}
-	if conf.maxRpm < conf.minRpm {
+	if conf.MaxRpm < conf.MinRpm {
 		return nil, errors.New("max_rpm must be >= min_rpm")
 	}
-	if conf.stepsPerRev <= 0 {
+	if conf.StepsPerRev <= 0 {
 		return nil, errors.New("steps_per_rev must be > 0")
 	}
 

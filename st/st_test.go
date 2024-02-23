@@ -20,15 +20,15 @@ func getMotorForTesting(t *testing.T) (context.Context, *st, error) {
 	logger := golog.NewTestLogger(t)
 	logger.WithOptions()
 	config := resource.Config{
-		ConvertedAttributes: &config{
-			uri:            "10.10.10.10:7776",
-			protocol:       "ip",
-			minRpm:         0,
-			maxRpm:         900,
-			connectTimeout: 1,
-			stepsPerRev:    StepsPerRev,
-			acceleration:   100,
-			deceleration:   100,
+		ConvertedAttributes: &Config{
+			Uri:            "10.10.10.10:7776",
+			Protocol:       "ip",
+			MinRpm:         0,
+			MaxRpm:         900,
+			ConnectTimeout: 1,
+			StepsPerRev:    StepsPerRev,
+			Acceleration:   100,
+			Deceleration:   100,
 		},
 	}
 	m, e := newMotor(ctx, nil, config, logger)
