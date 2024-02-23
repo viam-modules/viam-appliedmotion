@@ -116,6 +116,7 @@ func TestGoTo(t *testing.T) {
 }
 
 func TestPosition(t *testing.T) {
+	distance := 0.1 // revolutions to travel
 	ctx, motor, err := getMotorForTesting(t)
 	assert.Nil(t, err, "failed to construct motor")
 
@@ -128,17 +129,17 @@ func TestPosition(t *testing.T) {
 	assert.Equal(t, 0.0, position, "position should be 0")
 
 	// Move the motor a bit
-	err = motor.GoFor(ctx, 600, .01, nil)
+	err = motor.GoFor(ctx, 600, distance, nil)
 	assert.Nil(t, err, "error executing move command")
 
 	// Check the position again
 	position, err = motor.Position(ctx, nil)
 	assert.Nil(t, err, "error getting position")
-	expectedSteps := float64(StepsPerRev) * .01
+	expectedSteps := float64(StepsPerRev) * distance
 	assert.Equal(t, expectedSteps, position, "position should be equal to %v", expectedSteps)
 
 	// Move the motor a bit, but this time, backwards
-	err = motor.GoFor(ctx, 600, -.01, nil)
+	err = motor.GoFor(ctx, 600, -distance, nil)
 	assert.Nil(t, err, "error executing move command")
 
 	// Check the position again
