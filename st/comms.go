@@ -66,6 +66,9 @@ func newSerialComm(ctx context.Context, file string, logger golog.Logger) (commP
 func (s *comms) send(ctx context.Context, command string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	s.logger.Debugf("Sending command: %#v", command)
 
 	// As described on page 336 of
