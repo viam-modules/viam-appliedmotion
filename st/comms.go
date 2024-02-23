@@ -47,7 +47,7 @@ func newIpComm(ctx context.Context, uri string, timeout time.Duration, logger go
 	if socket, err := reconnect(); err != nil {
 		return nil, err
 	} else {
-		return &comms{handle: socket, URI: uri, logger: logger, reconnect: reconnect}, nil
+		return &comms{handle: socket, uri: uri, logger: logger, reconnect: reconnect}, nil
 	}
 }
 
@@ -60,7 +60,7 @@ func newSerialComm(ctx context.Context, file string, logger golog.Logger) (commP
 	if fd, err := reconnect(); err != nil {
 		return nil, err
 	} else {
-		return &comms{handle: fd, URI: file, logger: logger, reconnect: reconnect}, nil
+		return &comms{handle: fd, uri: file, logger: logger, reconnect: reconnect}, nil
 	}
 }
 
