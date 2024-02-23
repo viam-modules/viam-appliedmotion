@@ -244,6 +244,9 @@ func (s *st) Close(ctx context.Context) error {
 func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
 
 	// The speed we send to the motor controller must always be positive. If it comes in negative,
@@ -272,6 +275,10 @@ func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// FP?
 	// For Ethernet drives, do not use FP with a position parameter. Instead, use DI to set the target position.
 	// I guess this means run:
@@ -349,6 +356,9 @@ func (s *st) IsPowered(ctx context.Context, extra map[string]interface{}) (bool,
 func (s *st) Position(ctx context.Context, extra map[string]interface{}) (float64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	s.logger.Debugf("Position: extra=%v", extra)
 
 	// Use EP if we've got an encoder plugged in (this struct currently doesn't support that).
@@ -382,6 +392,9 @@ func (s *st) Properties(ctx context.Context, extra map[string]interface{}) (moto
 func (s *st) ResetZeroPosition(ctx context.Context, offset float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	s.logger.Debugf("ResetZeroPosition: offset=%v", offset)
 
 	// The driver only has 32 bits of precision. If we go beyond that, we're gonna have a bad time.
@@ -415,6 +428,9 @@ func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 	/*
 		s.mu.Lock()
 		defer s.mu.Unlock()
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 
 		// VE? This is in rev/sec
 		desiredRpm := s.maxRpm * powerPct
@@ -448,7 +464,11 @@ func (s *st) Stop(ctx context.Context, extras map[string]interface{}) error {
 func (s *st) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	s.logger.Debug("DoCommand called with %v", cmd)
+
 	command := cmd["command"].(string)
 	response, err := s.comm.send(ctx, command)
 	return map[string]interface{}{"response": response}, err
