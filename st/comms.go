@@ -105,6 +105,12 @@ func (s *comms) send(ctx context.Context, command string) (string, error) {
 			}
 		}
 
+		// It's possible that timing out, reconnecting, and flushing the responses has taken so
+		// long that the context is canceled. Check it here.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return "", multierr.Combine(err, ctxErr)
+		}
+
 		// Update the previous nWritten when we retry writing.
 		var secondErr error
 		nWritten, secondErr = s.handle.Write(sendBuffer)
