@@ -241,7 +241,9 @@ func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 	defer s.mu.Unlock()
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
 
-	if rpm < 0 { // The speed should always be positive. If it comes in negative, flip the distance to travel.
+	// The speed we send to the motor controller must always be positive. If it comes in negative,
+	// flip the distance to travel.
+	if rpm < 0 {
 		rpm *= -1
 		positionRevolutions *= -1
 	}
