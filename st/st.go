@@ -367,7 +367,7 @@ func (s *st) Position(ctx context.Context, extra map[string]interface{}) (float6
 			// We parsed the value as though it was unsigned, but it's really signed. We can't
 			// parse it as signed originally because strconv expects the sign to be indicated by a
 			// "-" at the beginning, not by the most significant bit in the word. Convert it here.
-			return float64(int32(val)), nil
+			return float64(int32(val))/float64(s.stepsPerRev), nil
 		}
 	}
 }

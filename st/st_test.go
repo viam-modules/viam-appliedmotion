@@ -13,7 +13,7 @@ import (
 	"go.viam.com/rdk/resource"
 )
 
-var StepsPerRev = int64(20000)
+const stepsPerRev = 20000
 
 func getMotorForTesting(t *testing.T) (context.Context, *st, error) {
 	ctx := context.TODO()
@@ -26,7 +26,7 @@ func getMotorForTesting(t *testing.T) (context.Context, *st, error) {
 			MinRpm:         0,
 			MaxRpm:         900,
 			ConnectTimeout: 1,
-			StepsPerRev:    StepsPerRev,
+			StepsPerRev:    stepsPerRev,
 			Acceleration:   100,
 			Deceleration:   100,
 		},
@@ -103,7 +103,7 @@ func TestGoTo(t *testing.T) {
 
 	position, err := motor.Position(ctx, nil)
 	assert.Nil(t, err, "error getting position")
-	expectedSteps := float64(StepsPerRev) * .001
+	expectedSteps := .001
 	assert.Equal(t, expectedSteps, position, "position should be equal to %v", expectedSteps)
 
 	err = motor.GoTo(ctx, 100, .01, nil)
@@ -111,7 +111,7 @@ func TestGoTo(t *testing.T) {
 
 	position, err = motor.Position(ctx, nil)
 	assert.Nil(t, err, "error getting position")
-	expectedSteps = float64(StepsPerRev) * .01
+	expectedSteps = .01
 	assert.Equal(t, expectedSteps, position, "position should be equal to %v", expectedSteps)
 }
 
@@ -135,7 +135,7 @@ func TestPosition(t *testing.T) {
 	// Check the position again
 	position, err = motor.Position(ctx, nil)
 	assert.Nil(t, err, "error getting position")
-	expectedSteps := float64(StepsPerRev) * distance
+	expectedSteps := .01
 	assert.Equal(t, expectedSteps, position, "position should be equal to %v", expectedSteps)
 
 	// Move the motor a bit, but this time, backwards
