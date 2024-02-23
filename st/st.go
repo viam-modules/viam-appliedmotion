@@ -12,19 +12,20 @@ import (
 	"time"
 
 	"github.com/edaniels/golog"
+	"go.uber.org/multierr"
 	"go.viam.com/rdk/components/motor"
 	"go.viam.com/rdk/resource"
 )
 
 var Model = resource.NewModel("viam-labs", "appliedmotion", "st")
 
-type ST struct {
+type st struct {
 	resource.Named
 	mu           sync.RWMutex
 	logger       golog.Logger
 	cancelCtx    context.Context
 	cancelFunc   func()
-	comm         CommPort
+	comm         commPort
 	minRpm       float64
 	maxRpm       float64
 	acceleration float64
@@ -41,14 +42,14 @@ func init() {
 	resource.RegisterComponent(
 		motor.API,
 		Model,
-		resource.Registration[motor.Motor, *Config]{Constructor: NewMotor})
+		resource.Registration[motor.Motor, *config]{Constructor: newMotor})
 }
 
-func NewMotor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger golog.Logger) (motor.Motor, error) {
+func newMotor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger golog.Logger) (motor.Motor, error) {
 	logger.Info("Starting Applied Motion Products ST Motor Driver v0.1")
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
-	b := ST{
+	s := st{
 		Named:      conf.ResourceName().AsNamed(),
 		logger:     logger,
 		cancelCtx:  cancelCtx,
@@ -56,80 +57,98 @@ func NewMotor(ctx context.Context, deps resource.Dependencies, conf resource.Con
 		mu:         sync.RWMutex{},
 	}
 
-	if err := b.Reconfigure(ctx, deps, conf); err != nil {
+	if err := s.Reconfigure(ctx, deps, conf); err != nil {
 		return nil, err
 	}
-	return &b, nil
+	return &s, nil
 }
 
-func (b *ST) Reconfigure(ctx context.Context, _ resource.Dependencies, conf resource.Config) error {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.logger.Debug("Reconfiguring Applied Motion Products ST Motor Driver")
+func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf resource.Config) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.logger.Debug("Reconfiguring Applied Motion Products ST Motor Driver")
 
-	newConf, err := resource.NativeConfig[*Config](conf)
+	newConf, err := resource.NativeConfig[*config](conf)
 	if err != nil {
 		return err
 	}
 
 	// In case the module has changed name
-	b.Named = conf.ResourceName().AsNamed()
+	s.Named = conf.ResourceName().AsNamed()
 
 	// Update the min/max RPM
-	b.minRpm = newConf.MinRpm
-	b.maxRpm = newConf.MaxRpm
+	s.minRpm = newConf.minRpm
+	s.maxRpm = newConf.maxRpm
 
 	// Update the steps per rev
-	b.stepsPerRev = newConf.StepsPerRev
-
-	b.acceleration = newConf.Acceleration
-	b.deceleration = newConf.Deceleration
+	s.stepsPerRev = newConf.stepsPerRev
 
 	// If we have an old comm object, shut it down. We'll set it up again next paragraph.
-	if b.comm != nil {
-		b.comm.Close()
-		b.comm = nil
+	if s.comm != nil {
+		s.comm.Close()
+		s.comm = nil
 	}
 
-	if comm, err := getComm(b.cancelCtx, newConf, b.logger); err != nil {
+	if comm, err := getComm(s.cancelCtx, newConf, s.logger); err != nil {
 		return err
 	} else {
-		b.comm = comm
+		s.comm = comm
+	}
+
+	s.acceleration = newConf.acceleration
+	if s.acceleration > 0 {
+		if err := s.comm.store(ctx, "AC", s.acceleration); err != nil {
+			return err
+		}
+	}
+
+	s.deceleration = newConf.deceleration
+	if s.deceleration > 0 {
+		if err := s.comm.store(ctx, "DE", s.deceleration); err != nil {
+			return err
+		}
+	}
+	// Set the maximum deceleration when stopping a move in the middle, too.
+	stopDecel := math.Max(s.acceleration, s.deceleration)
+	if stopDecel > 0 {
+		if err := s.comm.store(ctx, "AM", stopDecel); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func getComm(ctx context.Context, conf *Config, logger golog.Logger) (CommPort, error) {
+func getComm(ctx context.Context, conf *config, logger golog.Logger) (commPort, error) {
 	switch {
-	case strings.ToLower(conf.Protocol) == "can":
-		return nil, fmt.Errorf("unsupported comm type %s", conf.Protocol)
-	case strings.ToLower(conf.Protocol) == "ip":
+	case strings.ToLower(conf.protocol) == "can":
+		return nil, fmt.Errorf("unsupported comm type %s", conf.protocol)
+	case strings.ToLower(conf.protocol) == "ip":
 		logger.Debug("Creating IP Comm Port")
-		if conf.ConnectTimeout == 0 {
+		if conf.connectTimeout == 0 {
 			logger.Debug("Setting default connect timeout to 5 seconds")
-			conf.ConnectTimeout = 5
+			conf.connectTimeout = 5
 		}
-		timeout := time.Duration(conf.ConnectTimeout * int64(time.Second))
-		return newIpComm(ctx, conf.URI, timeout, logger)
-	case strings.ToLower(conf.Protocol) == "rs485":
+		timeout := time.Duration(conf.connectTimeout * int64(time.Second))
+		return newIpComm(ctx, conf.uri, timeout, logger)
+	case strings.ToLower(conf.protocol) == "rs485":
 		logger.Debug("Creating RS485 Comm Port")
-		return newSerialComm(ctx, conf.URI, logger)
-	case strings.ToLower(conf.Protocol) == "rs232":
+		return newSerialComm(ctx, conf.uri, logger)
+	case strings.ToLower(conf.protocol) == "rs232":
 		logger.Debug("Creating RS232 Comm Port")
-		return newSerialComm(ctx, conf.URI, logger)
+		return newSerialComm(ctx, conf.uri, logger)
 	default:
-		return nil, fmt.Errorf("unknown comm type %s", conf.Protocol)
+		return nil, fmt.Errorf("unknown comm type %s", conf.protocol)
 	}
 }
 
-func (s *ST) getStatus(ctx context.Context) ([]byte, error) {
-	if resp, err := s.comm.Send(ctx, "SC"); err != nil {
+func (s *st) getStatus(ctx context.Context) ([]byte, error) {
+	if resp, err := s.comm.send(ctx, "SC"); err != nil {
 		return nil, err
 	} else {
 		// TODO: document this better, once you've read the manual.
 
-		// Response format: "\x00\aSC=0009{63\r"
+		// Response format: "SC=0009{63"
 		// we need to strip off the command and any leading or trailing stuff
 		startIndex := strings.Index(resp, "=")
 		if startIndex == -1 {
@@ -159,12 +178,12 @@ func inPosition(status []byte) (bool, error) {
 	return (status[1]>>3)&1 == 1, nil
 }
 
-func (s *ST) getBufferStatus(ctx context.Context) (int, error) {
-	if resp, err := s.comm.Send(ctx, "BS"); err != nil {
+func (s *st) getBufferStatus(ctx context.Context) (int, error) {
+	if resp, err := s.comm.send(ctx, "BS"); err != nil {
 		return -1, err
 	} else {
 		// TODO: document this better. The current comment doesn't match the code.
-		// The response should look something like BS=<num>\r
+		// The response should look something like BS=<num>
 		startIndex := strings.Index(resp, "=")
 		if startIndex == -1 {
 			return -1, fmt.Errorf("unable to find response data in %v", resp)
@@ -183,7 +202,7 @@ func (s *ST) getBufferStatus(ctx context.Context) (int, error) {
 	}
 }
 
-func (s *ST) waitForMoveCommandToComplete(ctx context.Context) error {
+func (s *st) waitForMoveCommandToComplete(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
@@ -204,12 +223,12 @@ func (s *ST) waitForMoveCommandToComplete(ctx context.Context) error {
 	}
 }
 
-func (s *ST) isBufferEmpty(ctx context.Context) (bool, error) {
+func (s *st) isBufferEmpty(ctx context.Context) (bool, error) {
 	b, e := s.getBufferStatus(ctx)
 	return b == 63, e
 }
 
-func (s *ST) Close(ctx context.Context) error {
+func (s *st) Close(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -217,22 +236,28 @@ func (s *ST) Close(ctx context.Context) error {
 	return s.comm.Close()
 }
 
-func (s *ST) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
+func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
+
+	oldAcceleration, err := setOverrides(ctx, s.comm, extra)
+	if err != nil {
+		return err
+	}
 
 	// Send the configuration commands to setup the motor for the move
 	s.configureMove(ctx, positionRevolutions, rpm)
 
 	// Then actually execute the move
-	if _, err := s.comm.Send(ctx, "FL"); err != nil {
+	if _, err := s.comm.send(ctx, "FL"); err != nil {
 		return err
 	}
-	return s.waitForMoveCommandToComplete(ctx)
+	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
+	                        oldAcceleration.restore(ctx, s.comm))
 }
 
-func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
+func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// FP?
@@ -241,57 +266,42 @@ func (s *ST) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	// 	DI8000
 	// 	FP
 	s.logger.Debugf("GoTo: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
+
+	oldAcceleration, err := setOverrides(ctx, s.comm, extra)
+	if err != nil {
+		return err
+	}
+
 	// Send the configuration commands to setup the motor for the move
 	s.configureMove(ctx, positionRevolutions, rpm)
 
 	// Now execute the move command
-	if _, err := s.comm.Send(ctx, "FP"); err != nil {
+	if _, err := s.comm.send(ctx, "FP"); err != nil {
 		return err
 	}
-
-	// Now wait for the command to finish
-	return s.waitForMoveCommandToComplete(ctx)
+	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
+	                        oldAcceleration.restore(ctx, s.comm))
 }
 
-func (s *ST) configureMove(ctx context.Context, positionRevolutions, rpm float64) error {
+func (s *st) configureMove(ctx context.Context, positionRevolutions, rpm float64) error {
 	// need to convert from RPM to revs per second
 	revSec := rpm / 60
 	// need to convert from revs to steps
 	positionSteps := int64(positionRevolutions * float64(s.stepsPerRev))
 	// Set the distance first
-	if _, err := s.comm.Send(ctx, fmt.Sprintf("DI%d", positionSteps)); err != nil {
+	if _, err := s.comm.send(ctx, fmt.Sprintf("DI%d", positionSteps)); err != nil {
 		return err
 	}
 
 	// Now set the velocity
-	if _, err := s.comm.Send(ctx, fmt.Sprintf("VE%.4f", revSec)); err != nil {
+	if err := s.comm.store(ctx, "VE", revSec); err != nil {
 		return err
-	}
-
-	// Set the acceleration, if we have it
-	if s.acceleration > 0 {
-		if _, err := s.comm.Send(ctx, fmt.Sprintf("AC%.3f", s.acceleration)); err != nil {
-			return err
-		}
-	}
-	// Set the deceleration, if we have it
-	if s.deceleration > 0 {
-		if _, err := s.comm.Send(ctx, fmt.Sprintf("DE%.3f", s.deceleration)); err != nil {
-			return err
-		}
-	}
-	// Set the maximum deceleration when stopping a move in the middle, too.
-	stopDecel := math.Max(s.acceleration, s.deceleration)
-	if stopDecel > 0 {
-		if _, err := s.comm.Send(ctx, fmt.Sprintf("AM%.3f", stopDecel)); err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
 
-func (s *ST) IsMoving(ctx context.Context) (bool, error) {
+func (s *st) IsMoving(ctx context.Context) (bool, error) {
 	// If we locked the mutex, we'd block until after any GoFor or GoTo commands were finished! We
 	// also aren't mutating any state in the struct itself, so there is no need to lock it.
 	s.logger.Debug("IsMoving")
@@ -307,7 +317,7 @@ func (s *ST) IsMoving(ctx context.Context) (bool, error) {
 }
 
 // IsPowered implements motor.Motor.
-func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool, float64, error) {
+func (s *st) IsPowered(ctx context.Context, extra map[string]interface{}) (bool, float64, error) {
 	// The same as IsMoving, don't lock the mutex.
 	s.logger.Debugf("IsPowered: extra=%v", extra)
 	status, err := s.getStatus(ctx)
@@ -324,25 +334,21 @@ func (s *ST) IsPowered(ctx context.Context, extra map[string]interface{}) (bool,
 }
 
 // Position implements motor.Motor.
-func (s *ST) Position(ctx context.Context, extra map[string]interface{}) (float64, error) {
+func (s *st) Position(ctx context.Context, extra map[string]interface{}) (float64, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("Position: extra=%v", extra)
 	// EP?
 	// IP?
 	// The response should look something like IP=<num>\r
-	if resp, err := s.comm.Send(ctx, "IP"); err != nil {
+	if resp, err := s.comm.send(ctx, "IP"); err != nil {
 		return 0, err
 	} else {
 		startIndex := strings.Index(resp, "=")
 		if startIndex == -1 {
 			return 0, fmt.Errorf("unexpected response %v", resp)
 		}
-		endIndex := strings.Index(resp, "\r")
-		if endIndex == -1 {
-			return 0, fmt.Errorf("unexpected response %v", resp)
-		}
-		resp = resp[startIndex+1 : endIndex]
+		resp = resp[startIndex+1:]
 		if val, err := strconv.ParseUint(resp, 16, 32); err != nil {
 			return 0, err
 		} else {
@@ -352,23 +358,23 @@ func (s *ST) Position(ctx context.Context, extra map[string]interface{}) (float6
 }
 
 // Properties implements motor.Motor.
-func (s *ST) Properties(ctx context.Context, extra map[string]interface{}) (motor.Properties, error) {
+func (s *st) Properties(ctx context.Context, extra map[string]interface{}) (motor.Properties, error) {
 	return motor.Properties{PositionReporting: true}, nil
 }
 
 // ResetZeroPosition implements motor.Motor.
-func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[string]interface{}) error {
+func (s *st) ResetZeroPosition(ctx context.Context, offset float64, extra map[string]interface{}) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	// The docs seem to indicate that for proper reset to 0, you must send both EP0 and SP0
 	s.logger.Debugf("ResetZeroPosition: offset=%v", offset)
 	// First reset the encoder
-	if _, err := s.comm.Send(ctx, "EP0"); err != nil {
+	if _, err := s.comm.send(ctx, "EP0"); err != nil {
 		return err
 	}
 
 	// Then reset the internal position
-	if _, err := s.comm.Send(ctx, "SP0"); err != nil {
+	if _, err := s.comm.send(ctx, "SP0"); err != nil {
 		return err
 	}
 
@@ -376,7 +382,7 @@ func (s *ST) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 }
 
 // SetPower implements motor.Motor.
-func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
+func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
 	// We could tell it to move at a certain speed for a very large number of rotations, but that's
 	// as close as this motor gets to having a "set power" function. A sketch of that
 	// implementation is commented out below.
@@ -393,7 +399,7 @@ func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 		s.configureMove(ctx, int64(math.MaxInt32), desiredRpm)
 
 		// Now execute the move command
-		if _, err := s.comm.Send(ctx, "FP"); err != nil {
+		if _, err := s.comm.send(ctx, "FP"); err != nil {
 			return err
 		}
 		// We explicitly don't want to wait for the command to finish
@@ -402,23 +408,23 @@ func (s *ST) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 }
 
 // Stop implements motor.Motor.
-func (s *ST) Stop(ctx context.Context, extras map[string]interface{}) error {
+func (s *st) Stop(ctx context.Context, extras map[string]interface{}) error {
 	// SK - Stop & Kill? Stops and erases queue
 	// SM - Stop Move? Stops and leaves queue intact?
 	// ST - Halts the current buffered command being executed, but does not affect other buffered commands in the command buffer
 	s.logger.Debugf("Stop called with %v", extras)
-	_, err := s.comm.Send(ctx, "SK") // Stop the current move and clear any queued moves, too.
+	_, err := s.comm.send(ctx, "SK") // Stop the current move and clear any queued moves, too.
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *ST) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
+func (s *st) DoCommand(ctx context.Context, cmd map[string]interface{}) (map[string]interface{}, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debug("DoCommand called with %v", cmd)
 	command := cmd["command"].(string)
-	response, err := s.comm.Send(ctx, command)
+	response, err := s.comm.send(ctx, command)
 	return map[string]interface{}{"response": response}, err
 }
