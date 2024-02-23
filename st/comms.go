@@ -22,9 +22,10 @@ type comms struct {
 	logger golog.Logger
 	ctx    context.Context
 	uri    string
-	handle io.ReadWriteCloser
 
 	// Sometimes the IP-based motor controllers lose their connection, and we need to make it again.
+	// The reconnect function is a way to create a new handle when needed.
+	handle    io.ReadWriteCloser
 	reconnect func() (io.ReadWriteCloser, error)
 }
 
