@@ -7,15 +7,18 @@ import (
 )
 
 type Config struct {
-	Attributes     utils.AttributeMap `json:"attributes,omitempty"`
-	Protocol       string             `json:"protocol"`
-	Uri            string             `json:"uri"`
-	MinRpm         float64            `json:"min_rpm"`
-	MaxRpm         float64            `json:"max_rpm"`
-	StepsPerRev    int64              `json:"steps_per_rev"`
-	ConnectTimeout int64              `json:"connect_timeout,omitempty"`
-	Acceleration   float64            `json:"acceleration,omitempty"`
-	Deceleration   float64            `json:"deceleration,omitempty"`
+	Attributes utils.AttributeMap `json:"attributes,omitempty"`
+
+	Protocol       string `json:"protocol"`
+	Uri            string `json:"uri"`
+	ConnectTimeout int64  `json:"connect_timeout,omitempty"`
+
+	StepsPerRev int64 `json:"steps_per_rev"`
+
+	MinRpm       float64 `json:"min_rpm"`
+	MaxRpm       float64 `json:"max_rpm"`
+	Acceleration float64 `json:"acceleration,omitempty"`
+	Deceleration float64 `json:"deceleration,omitempty"`
 }
 
 // Validate ensures all parts of the config are valid.
