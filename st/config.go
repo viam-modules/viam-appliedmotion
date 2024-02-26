@@ -2,7 +2,9 @@ package st
 
 import (
 	"errors"
+	"fmt"
 
+	"go.uber.org/multierr"
 	"go.viam.com/rdk/utils"
 )
 
@@ -33,6 +35,11 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	if conf.Uri == "" {
 		return nil, errors.New("URI is required")
 	}
+	if conf.StepsPerRev <= 0 {
+		return nil, errors.New("steps_per_rev must be > 0")
+	}
+
+	// RPM checks
 	if conf.MinRpm < 0 {
 		return nil, errors.New("min_rpm must be >= 0")
 	}
@@ -42,9 +49,25 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	if conf.MaxRpm < conf.MinRpm {
 		return nil, errors.New("max_rpm must be >= min_rpm")
 	}
-	if conf.StepsPerRev <= 0 {
-		return nil, errors.New("steps_per_rev must be > 0")
+
+	// Acceleration checks: start with a helper function
+	checkLessThan := func(a, b float64, accelPrefix, prefixA, prefixB string) error {
+		if a == 0 || b == 0 {
+			// One of these is not defined and will be the default. The default is always ok.
+			return nil
+		}
+		if a > b {
+			return fmt.Errorf("%s%sceleration must be <= %s%sceleration", prefixA, accelPrefix, prefixB, accelPrefix)
+		}
+		return nil
 	}
 
-	return nil, nil
+	return nil, multierr.Combine(
+		checkLessThan(conf.MinAcceleration,     conf.MaxAcceleration,     "ac", "min_", "max_"),
+		checkLessThan(conf.MinAcceleration,     conf.DefaultAcceleration, "ac", "min_", ""),
+		checkLessThan(conf.DefaultAcceleration, conf.MaxAcceleration,     "ac", "",     "max_"),
+		checkLessThan(conf.MinDeceleration,     conf.MaxDeceleration,     "de", "min_", "max_"),
+		checkLessThan(conf.MinDeceleration,     conf.DefaultDeceleration, "de", "min_", ""),
+		checkLessThan(conf.DefaultDeceleration, conf.MaxDeceleration,     "de", "",     "max_"),
+	)
 }
