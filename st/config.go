@@ -15,10 +15,14 @@ type Config struct {
 
 	StepsPerRev int64 `json:"steps_per_rev"`
 
-	MinRpm       float64 `json:"min_rpm"`
-	MaxRpm       float64 `json:"max_rpm"`
-	Acceleration float64 `json:"acceleration,omitempty"`
-	Deceleration float64 `json:"deceleration,omitempty"`
+	MinRpm              float64 `json:"min_rpm"`
+	MaxRpm              float64 `json:"max_rpm"`
+	DefaultAcceleration float64 `json:"acceleration,omitempty"`
+	DefaultDeceleration float64 `json:"deceleration,omitempty"`
+	MinAcceleration     float64 `json:"min_acceleration,omitempty"`
+	MinDeceleration     float64 `json:"min_deceleration,omitempty"`
+	MaxAcceleration     float64 `json:"max_acceleration,omitempty"`
+	MaxDeceleration     float64 `json:"max_deceleration,omitempty"`
 }
 
 // Validate ensures all parts of the config are valid.

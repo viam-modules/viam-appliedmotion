@@ -95,14 +95,14 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 		s.comm = comm
 	}
 
-	s.acceleration = newConf.Acceleration
+	s.acceleration = newConf.DefaultAcceleration
 	if s.acceleration > 0 {
 		if err := s.comm.store(ctx, "AC", s.acceleration); err != nil {
 			return err
 		}
 	}
 
-	s.deceleration = newConf.Deceleration
+	s.deceleration = newConf.DefaultDeceleration
 	if s.deceleration > 0 {
 		if err := s.comm.store(ctx, "DE", s.deceleration); err != nil {
 			return err

@@ -21,14 +21,14 @@ func getMotorForTesting(t *testing.T) (context.Context, *st, error) {
 	logger.WithOptions()
 	config := resource.Config{
 		ConvertedAttributes: &Config{
-			Uri:            "10.10.10.10:7776",
-			Protocol:       "ip",
-			MinRpm:         0,
-			MaxRpm:         900,
-			ConnectTimeout: 1,
-			StepsPerRev:    stepsPerRev,
-			Acceleration:   100,
-			Deceleration:   100,
+			Uri:                 "10.10.10.10:7776",
+			Protocol:            "ip",
+			MinRpm:              0,
+			MaxRpm:              900,
+			ConnectTimeout:      1,
+			StepsPerRev:         stepsPerRev,
+			DefaultAcceleration: 100,
+			DefaultDeceleration: 100,
 		},
 	}
 	m, e := newMotor(ctx, nil, config, logger)
