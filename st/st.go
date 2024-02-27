@@ -277,6 +277,17 @@ func (s *st) configuredMove(
 	positionRevolutions, rpm float64,
 	extra map[string]interface{},
 ) error {
+	if val, exists := extra["acceleration"]; exists {
+		if valFloat, ok := val.(float64); ok {
+			extra["acceleration"] = s.accelLimits.Bound(valFloat, s.logger)
+		}
+	}
+	if val, exists := extra["deceleration"]; exists {
+		if valFloat, ok := val.(float64); ok {
+			extra["deceleration"] = s.decelLimits.Bound(valFloat, s.logger)
+		}
+	}
+
 	oldAcceleration, err := setOverrides(ctx, s.comm, extra)
 	if err != nil {
 		return err
