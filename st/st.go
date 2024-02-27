@@ -26,11 +26,11 @@ type st struct {
 	cancelCtx    context.Context
 	cancelFunc   func()
 	comm         commPort
-	minRpm       float64
-	maxRpm       float64
-	acceleration float64
-	deceleration float64
 	stepsPerRev  int64
+
+	accelLimits limits
+	decelLimits limits
+	rpmLimits limits
 }
 
 var ErrStatusMessageIncorrectLength = errors.New("status message incorrect length")
@@ -76,10 +76,6 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	// In case the module has changed name
 	s.Named = conf.ResourceName().AsNamed()
 
-	// Update the min/max RPM
-	s.minRpm = newConf.MinRpm
-	s.maxRpm = newConf.MaxRpm
-
 	// Update the steps per rev
 	s.stepsPerRev = newConf.StepsPerRev
 
@@ -95,21 +91,25 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 		s.comm = comm
 	}
 
-	s.acceleration = newConf.DefaultAcceleration
-	if s.acceleration > 0 {
-		if err := s.comm.store(ctx, "AC", s.acceleration); err != nil {
+	s.accelLimits = newLimits("acceleration", newConf.MinAcceleration, newConf.MaxAcceleration)
+	s.decelLimits = newLimits("deceleration", newConf.MinDeceleration, newConf.MaxDeceleration)
+	s.rpmLimits = newLimits("rpm", newConf.MinRpm, newConf.MaxRpm)
+
+	acceleration := newConf.DefaultAcceleration
+	if acceleration > 0 {
+		if err := s.comm.store(ctx, "AC", acceleration); err != nil {
 			return err
 		}
 	}
 
-	s.deceleration = newConf.DefaultDeceleration
-	if s.deceleration > 0 {
-		if err := s.comm.store(ctx, "DE", s.deceleration); err != nil {
+	deceleration := newConf.DefaultDeceleration
+	if deceleration > 0 {
+		if err := s.comm.store(ctx, "DE", deceleration); err != nil {
 			return err
 		}
 	}
 	// Set the maximum deceleration when stopping a move in the middle, too.
-	stopDecel := math.Max(s.acceleration, s.deceleration)
+	stopDecel := math.Max(acceleration, deceleration)
 	if stopDecel > 0 {
 		if err := s.comm.store(ctx, "AM", stopDecel); err != nil {
 			return err
@@ -296,6 +296,8 @@ func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 }
 
 func (s *st) configureMove(ctx context.Context, positionRevolutions, rpm float64) error {
+	rpm = s.rpmLimits.Bound(rpm, s.logger)
+
 	// need to convert from RPM to revs per second
 	revSec := rpm / 60
 	// need to convert from revs to steps
