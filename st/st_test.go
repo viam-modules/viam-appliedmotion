@@ -152,7 +152,7 @@ func TestPosition(t *testing.T) {
 
 	position, err = motor.Position(ctx, nil)
 	assert.Nil(t, err, "error getting position")
-	assert.Equal(t, float64(-1), position)
+	assert.Equal(t, -1.0, position)
 
 	err = motor.GoFor(ctx, 600, 1, nil)
 	assert.Nil(t, err, "error executing move command")
