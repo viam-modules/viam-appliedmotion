@@ -253,20 +253,8 @@ func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64
 		positionRevolutions *= -1
 	}
 
-	oldAcceleration, err := setOverrides(ctx, s.comm, extra)
-	if err != nil {
-		return err
-	}
-
 	// Send the configuration commands to setup the motor for the move
-	s.configureMove(ctx, positionRevolutions, rpm)
-
-	// Then actually execute the move
-	if _, err := s.comm.send(ctx, "FL"); err != nil {
-		return err
-	}
-	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
-	                        oldAcceleration.restore(ctx, s.comm))
+	return s.configuredMove(ctx, "FL", positionRevolutions, rpm, extra)
 }
 
 func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
@@ -279,23 +267,21 @@ func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	// 	FP
 	s.logger.Debugf("GoTo: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
 
+	// Send the configuration commands to setup the motor for the move
+	return s.configuredMove(ctx, "FP", positionRevolutions, rpm, extra)
+}
+
+func (s *st) configuredMove(
+	ctx context.Context,
+	command string,
+	positionRevolutions, rpm float64,
+	extra map[string]interface{},
+) error {
 	oldAcceleration, err := setOverrides(ctx, s.comm, extra)
 	if err != nil {
 		return err
 	}
 
-	// Send the configuration commands to setup the motor for the move
-	s.configureMove(ctx, positionRevolutions, rpm)
-
-	// Now execute the move command
-	if _, err := s.comm.send(ctx, "FP"); err != nil {
-		return err
-	}
-	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
-	                        oldAcceleration.restore(ctx, s.comm))
-}
-
-func (s *st) configureMove(ctx context.Context, positionRevolutions, rpm float64) error {
 	rpm = s.rpmLimits.Bound(rpm, s.logger)
 
 	// need to convert from RPM to revs per second
@@ -312,7 +298,11 @@ func (s *st) configureMove(ctx context.Context, positionRevolutions, rpm float64
 		return err
 	}
 
-	return nil
+	if _, err := s.comm.send(ctx, command); err != nil {
+		return err
+	}
+	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
+	                        oldAcceleration.restore(ctx, s.comm))
 }
 
 func (s *st) IsMoving(ctx context.Context) (bool, error) {
