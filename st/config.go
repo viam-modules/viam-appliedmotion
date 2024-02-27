@@ -62,6 +62,13 @@ func (conf *Config) Validate(path string) ([]string, error) {
 		return nil
 	}
 
+	checkNonNegative := func(val float64, name string) error {
+		if val < 0 {
+			return fmt.Errorf("%s must be >= 0", name)
+		}
+		return nil
+	}
+
 	return nil, multierr.Combine(
 		checkLessThan(conf.MinAcceleration,     conf.MaxAcceleration,     "ac", "min_", "max_"),
 		checkLessThan(conf.MinAcceleration,     conf.DefaultAcceleration, "ac", "min_", ""),
@@ -69,5 +76,11 @@ func (conf *Config) Validate(path string) ([]string, error) {
 		checkLessThan(conf.MinDeceleration,     conf.MaxDeceleration,     "de", "min_", "max_"),
 		checkLessThan(conf.MinDeceleration,     conf.DefaultDeceleration, "de", "min_", ""),
 		checkLessThan(conf.DefaultDeceleration, conf.MaxDeceleration,     "de", "",     "max_"),
+		checkNonNegative(conf.DefaultAcceleration, "acceleration"),
+		checkNonNegative(conf.DefaultDeceleration, "acceleration"),
+		checkNonNegative(conf.MinAcceleration, "min_acceleration"),
+		checkNonNegative(conf.MinDeceleration, "min_acceleration"),
+		checkNonNegative(conf.MaxAcceleration, "max_deceleration"),
+		checkNonNegative(conf.MaxDeceleration, "max_deceleration"),
 	)
 }
