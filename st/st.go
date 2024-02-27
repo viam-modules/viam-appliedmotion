@@ -414,6 +414,8 @@ func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 	// We could tell it to move at a certain speed for a very large number of rotations, but that's
 	// as close as this motor gets to having a "set power" function. A sketch of that
 	// implementation is commented out below.
+	// TODO: consider using a FS command to go until a sensor (limit switch?) is tripped, and
+	// specifying a sensor that is not plugged in and will never trip.
 	return errors.New("set power is not supported for this motor")
 }
 
