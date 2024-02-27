@@ -404,24 +404,6 @@ func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 	// as close as this motor gets to having a "set power" function. A sketch of that
 	// implementation is commented out below.
 	return errors.New("set power is not supported for this motor")
-	/*
-		s.mu.Lock()
-		defer s.mu.Unlock()
-
-		// VE? This is in rev/sec
-		desiredRpm := s.maxRpm * powerPct
-		s.logger.Warn("SetPower called on motor that uses rotational velocity. Scaling %v based on max Rpm %v. Resulting power: %v", powerPct, s.maxRpm, desiredRpm)
-
-		// Send the configuration commands to setup the motor for the move
-		s.configureMove(ctx, int64(math.MaxInt32), desiredRpm)
-
-		// Now execute the move command
-		if _, err := s.comm.send(ctx, "FP"); err != nil {
-			return err
-		}
-		// We explicitly don't want to wait for the command to finish
-		return nil
-	*/
 }
 
 // Stop implements motor.Motor.
