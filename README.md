@@ -43,3 +43,7 @@ _*Denotes configuration value is optional_
 ## Network Setup (for ethernet-connected motor controllers like the STF10-IP)
 
 Assuming you set the dial on the side of the controller to a static IP address such as 10.10.10.10, you will need to configure your computer to know where to find it. On your computer, go to the settings for the ethernet device to which the motor controller is connected. In the IPv4 settings, set the method for obtaining an IP address to Manual (rather than, for example, DHCP). Add the address 10.10.10.1 with a netmask of 24, which instructs the computer to look for all addresses in the 10.10.10.xx on that ethernet port, while still looking for all other traffic on other network connections. Save and close these settings.
+
+## Using extra parameters in the movement RPCs
+
+In the `GoTo` and `GoFor` commands, you can optionally set the `"acceleration"` and `"deceleration"` in the `extra` parameters. If you set either (or both!) of them, they should be 64-bit floating point numbers (sometimes called doubles), describing the acceleration/deceleration to use in revolutions per second^2. If you have also set the minimum or maximum acceleration/deceleration in the config, and the `extra` value falls outside the allowable range, we will instead use the minimum or maximum (depending on whether the `extra` value was too low or too high, respectively).
