@@ -199,3 +199,52 @@ func TestAccelOverrides(t *testing.T) {
 	assert.Greater(t, t3.Sub(t2), 2 * t1.Sub(t2)) // Slow acceleration takes longer than default
 	assert.Greater(t, t4.Sub(t3), 2 * t1.Sub(t2)) // Slow deceleration takes longer than default, too
 }
+
+func TestAccelLimits(t *testing.T) {
+	// Start with a helper that takes a Config and returns how long it took to turn the motor 1
+	// revolution at a standard speed.
+	timeRevolution := func(
+		config *Config, description string, extra map[string]interface{},
+	) time.Duration {
+		ctx, motor, err := getMotorForTesting(t, config)
+		assert.Nil(t, err, "failed to construct motor")
+		start := time.Now()
+		err = motor.GoFor(ctx, 600, 1, extra)
+		assert.Nil(t, err, description)
+		end := time.Now()
+		return end.Sub(start)
+	}
+
+	assertApproximatelyEqual := func(a, b time.Duration, message string) {
+		tolerance := 0.1 // Fraction of values that can differ
+		assert.Greater(t, time.Duration((1 + tolerance) * float64(a)), b, message)
+		assert.Greater(t, time.Duration((1 + tolerance) * float64(b)), a, message)
+	}
+
+	conf := getDefaultConfig()
+	defaultTime := timeRevolution(conf, "default config", nil)
+
+	conf = getDefaultConfig() // Reset anything changed in a previous test
+	conf.MinAcceleration = 100
+	clampedMinAccelTime := timeRevolution(conf, "setting acceleration below minimum",
+	                                      map[string]interface{}{"acceleration": 10.0})
+	assertApproximatelyEqual(defaultTime, clampedMinAccelTime, "acceleration below minimum")
+
+	conf = getDefaultConfig()
+	conf.MaxAcceleration = 100
+	clampedMaxAccelTime := timeRevolution(conf, "setting acceleration above maximum",
+	                                      map[string]interface{}{"acceleration": 200.0})
+	assertApproximatelyEqual(defaultTime, clampedMaxAccelTime, "acceleration above maximum")
+
+	conf = getDefaultConfig()
+	conf.MinDeceleration = 100
+	clampedMinDecelTime := timeRevolution(conf, "setting deceleration below minimum",
+	                                      map[string]interface{}{"deceleration": 10.0})
+	assertApproximatelyEqual(defaultTime, clampedMinDecelTime, "deceleration below minimum")
+
+	conf = getDefaultConfig()
+	conf.MaxDeceleration = 100
+	clampedMaxDecelTime := timeRevolution(conf, "setting deceleration above maximum",
+	                                      map[string]interface{}{"deceleration": 200.0})
+	assertApproximatelyEqual(defaultTime, clampedMaxDecelTime, "deceleration above maximum")
+}
