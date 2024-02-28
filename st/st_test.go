@@ -224,6 +224,8 @@ func TestAccelLimits(t *testing.T) {
 	conf := getDefaultConfig()
 	defaultTime := timeRevolution(conf, "default config", nil)
 
+	// If you try to set accel/decel values out of range, clamp it to the min/max.
+
 	conf = getDefaultConfig() // Reset anything changed in a previous test
 	conf.MinAcceleration = 100
 	clampedMinAccelTime := timeRevolution(conf, "setting acceleration below minimum",
@@ -247,4 +249,37 @@ func TestAccelLimits(t *testing.T) {
 	clampedMaxDecelTime := timeRevolution(conf, "setting deceleration above maximum",
 	                                      map[string]interface{}{"deceleration": 200.0})
 	assertApproximatelyEqual(defaultTime, clampedMaxDecelTime, "deceleration above maximum")
+
+	// but clamping shouldn't affect values within the valid range!
+	conf = getDefaultConfig()
+	conf.MinAcceleration = 1
+	conf.MinDeceleration = 1
+	unclampedMinAccelTime := timeRevolution(conf, "setting acceleration below minimum",
+	                                        map[string]interface{}{"acceleration": 10.0})
+	assert.Greater(t, unclampedMinAccelTime, 2 * defaultTime)
+	unclampedMinDecelTime := timeRevolution(conf, "setting deceleration below minimum",
+	                                        map[string]interface{}{"deceleration": 10.0})
+	assert.Greater(t, unclampedMinDecelTime, 2 * defaultTime)
+
+	// Increasing the maximum acceleration above 100 rev/sec^2 doesn't seem to appreciably affect
+	// the total move time. So instead, let's lower the default acceleration and make sure that you
+	// can set it fast again anyway.
+	conf = getDefaultConfig()
+	conf.DefaultAcceleration = 10
+	conf.DefaultDeceleration = 10
+	slowAccelDefaultTime := timeRevolution(conf, "slow accel config", nil)
+
+	conf = getDefaultConfig()
+	conf.DefaultAcceleration = 10
+	conf.MaxAcceleration = 200
+	unclampedMaxAccelTime := timeRevolution(conf, "setting acceleration above maximum",
+	                                        map[string]interface{}{"acceleration": 100.0})
+	assert.Greater(t, slowAccelDefaultTime, 2 * unclampedMaxAccelTime)
+
+	conf = getDefaultConfig()
+	conf.DefaultDeceleration = 10
+	conf.MaxDeceleration = 200
+	unclampedMaxDecelTime := timeRevolution(conf, "setting deceleration above maximum",
+	                                        map[string]interface{}{"deceleration": 100.0})
+	assert.Greater(t, slowAccelDefaultTime, 2 * unclampedMaxDecelTime)
 }
