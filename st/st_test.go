@@ -15,23 +15,25 @@ import (
 
 const stepsPerRev = 20000
 
-func getMotorForTesting(t *testing.T) (context.Context, *st, error) {
+func getDefaultConfig() *Config {
+	return &Config{
+		Uri:                 "10.10.10.10:7776",
+		Protocol:            "ip",
+		MinRpm:              0,
+		MaxRpm:              900,
+		ConnectTimeout:      1,
+		StepsPerRev:         stepsPerRev,
+		DefaultAcceleration: 100,
+		DefaultDeceleration: 100,
+	}
+}
+
+func getMotorForTesting(t *testing.T, config *Config) (context.Context, *st, error) {
 	ctx := context.TODO()
 	logger := golog.NewTestLogger(t)
 	logger.WithOptions()
-	config := resource.Config{
-		ConvertedAttributes: &Config{
-			Uri:                 "10.10.10.10:7776",
-			Protocol:            "ip",
-			MinRpm:              0,
-			MaxRpm:              900,
-			ConnectTimeout:      1,
-			StepsPerRev:         stepsPerRev,
-			DefaultAcceleration: 100,
-			DefaultDeceleration: 100,
-		},
-	}
-	m, e := newMotor(ctx, nil, config, logger)
+	resourceConf := resource.Config{ConvertedAttributes: config}
+	m, e := newMotor(ctx, nil, resourceConf, logger)
 
 	// unwrap motor.Motor into st so we can access some non-interface members
 	st, _ := m.(*st)
@@ -39,7 +41,7 @@ func getMotorForTesting(t *testing.T) (context.Context, *st, error) {
 }
 
 func TestMotorIsMoving(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
 
 	isMoving, err := motor.IsMoving(ctx)
@@ -62,7 +64,7 @@ func TestMotorIsMoving(t *testing.T) {
 }
 
 func TestStatusFunctions(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
 
 	status, err := motor.getStatus(ctx)
@@ -80,7 +82,7 @@ func TestStatusFunctions(t *testing.T) {
 }
 
 func TestGoFor(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
 
 	err = motor.GoFor(ctx, 600, .001, nil)
@@ -91,7 +93,7 @@ func TestGoFor(t *testing.T) {
 }
 
 func TestGoTo(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
 
 	// First reset the position to 0
@@ -117,7 +119,7 @@ func TestGoTo(t *testing.T) {
 
 func TestPosition(t *testing.T) {
 	distance := 0.1 // revolutions to travel
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
 
 	// First reset the position to 0
@@ -163,7 +165,7 @@ func TestPosition(t *testing.T) {
 }
 
 func TestDoCommand(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
 	_, err = motor.DoCommand(ctx, map[string]interface{}{"command": "DI20000"})
 	assert.Nil(t, err, "error executing do command")
@@ -179,7 +181,7 @@ func TestDoCommand(t *testing.T) {
 }
 
 func TestAccelOverrides(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
 
 	// Since we're moving a real motor, we can use real time to see how fast it's going.
