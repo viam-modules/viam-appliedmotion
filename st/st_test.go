@@ -43,6 +43,7 @@ func getMotorForTesting(t *testing.T, config *Config) (context.Context, *st, err
 func TestMotorIsMoving(t *testing.T) {
 	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	isMoving, err := motor.IsMoving(ctx)
 	assert.Nil(t, err, "failed to get motor status")
@@ -66,6 +67,7 @@ func TestMotorIsMoving(t *testing.T) {
 func TestStatusFunctions(t *testing.T) {
 	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	status, err := motor.getStatus(ctx)
 	assert.Nil(t, err, "failed to get motor status")
@@ -84,6 +86,7 @@ func TestStatusFunctions(t *testing.T) {
 func TestGoFor(t *testing.T) {
 	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	err = motor.GoFor(ctx, 600, .001, nil)
 	assert.Nil(t, err, "error executing move command")
@@ -95,6 +98,7 @@ func TestGoFor(t *testing.T) {
 func TestGoTo(t *testing.T) {
 	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	// First reset the position to 0
 	err = motor.ResetZeroPosition(ctx, 0, nil)
@@ -121,6 +125,7 @@ func TestPosition(t *testing.T) {
 	distance := 0.1 // revolutions to travel
 	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	// First reset the position to 0
 	err = motor.ResetZeroPosition(ctx, 0, nil)
@@ -167,6 +172,8 @@ func TestPosition(t *testing.T) {
 func TestDoCommand(t *testing.T) {
 	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
+
 	_, err = motor.DoCommand(ctx, map[string]interface{}{"command": "DI20000"})
 	assert.Nil(t, err, "error executing do command")
 	_, err = motor.DoCommand(ctx, map[string]interface{}{"command": "VE1"})
@@ -183,6 +190,7 @@ func TestDoCommand(t *testing.T) {
 func TestAccelOverrides(t *testing.T) {
 	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	// Since we're moving a real motor, we can use real time to see how fast it's going.
 	t1 := time.Now()
@@ -208,6 +216,8 @@ func TestAccelLimits(t *testing.T) {
 	) time.Duration {
 		ctx, motor, err := getMotorForTesting(t, config)
 		assert.Nil(t, err, "failed to construct motor")
+		defer motor.Close(ctx)
+
 		start := time.Now()
 		err = motor.GoFor(ctx, 600, 1, extra)
 		assert.Nil(t, err, description)
