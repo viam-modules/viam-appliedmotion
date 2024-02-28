@@ -216,7 +216,7 @@ func TestAccelLimits(t *testing.T) {
 	}
 
 	assertApproximatelyEqual := func(a, b time.Duration, message string) {
-		tolerance := 0.1 // Fraction of values that can differ
+		tolerance := 0.07 // Fraction of values that can differ
 		assert.Greater(t, time.Duration((1 + tolerance) * float64(a)), b, message)
 		assert.Greater(t, time.Duration((1 + tolerance) * float64(b)), a, message)
 	}
