@@ -53,7 +53,13 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	// Acceleration checks: start with a helper function
 	checkLessThan := func(a, b float64, accelPrefix, prefixA, prefixB string) error {
 		if a == 0 || b == 0 {
-			// One of these is not defined and will be the default. The default is always ok.
+			// If a maximum or minimum limit is not defined, we won't use that limit, and
+			// everything is okay. If a default value is not defined, we'll use the value already
+			// stored within the motor controller.
+			// WARNING: if we set the max/min acceleration (or deceleration) but not the default,
+			// it's possible that the motor controller's pre-set default value falls outside of the
+			// max/min we intend to use. We assume the pre-set values are reasonable, but can
+			// change this implementation if necessary.
 			return nil
 		}
 		if a > b {
