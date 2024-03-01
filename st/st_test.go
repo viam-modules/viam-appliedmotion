@@ -15,23 +15,25 @@ import (
 
 const stepsPerRev = 20000
 
-func getMotorForTesting(t *testing.T) (context.Context, *st, error) {
+func getDefaultConfig() *Config {
+	return &Config{
+		Uri:                 "10.10.10.10:7776",
+		Protocol:            "ip",
+		MinRpm:              0,
+		MaxRpm:              900,
+		ConnectTimeout:      1,
+		StepsPerRev:         stepsPerRev,
+		DefaultAcceleration: 100,
+		DefaultDeceleration: 100,
+	}
+}
+
+func getMotorForTesting(t *testing.T, config *Config) (context.Context, *st, error) {
 	ctx := context.TODO()
 	logger := golog.NewTestLogger(t)
 	logger.WithOptions()
-	config := resource.Config{
-		ConvertedAttributes: &Config{
-			Uri:            "10.10.10.10:7776",
-			Protocol:       "ip",
-			MinRpm:         0,
-			MaxRpm:         900,
-			ConnectTimeout: 1,
-			StepsPerRev:    stepsPerRev,
-			Acceleration:   100,
-			Deceleration:   100,
-		},
-	}
-	m, e := newMotor(ctx, nil, config, logger)
+	resourceConf := resource.Config{ConvertedAttributes: config}
+	m, e := newMotor(ctx, nil, resourceConf, logger)
 
 	// unwrap motor.Motor into st so we can access some non-interface members
 	st, _ := m.(*st)
@@ -39,8 +41,9 @@ func getMotorForTesting(t *testing.T) (context.Context, *st, error) {
 }
 
 func TestMotorIsMoving(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	isMoving, err := motor.IsMoving(ctx)
 	assert.Nil(t, err, "failed to get motor status")
@@ -62,8 +65,9 @@ func TestMotorIsMoving(t *testing.T) {
 }
 
 func TestStatusFunctions(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	status, err := motor.getStatus(ctx)
 	assert.Nil(t, err, "failed to get motor status")
@@ -80,8 +84,9 @@ func TestStatusFunctions(t *testing.T) {
 }
 
 func TestGoFor(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	err = motor.GoFor(ctx, 600, .001, nil)
 	assert.Nil(t, err, "error executing move command")
@@ -91,8 +96,9 @@ func TestGoFor(t *testing.T) {
 }
 
 func TestGoTo(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	// First reset the position to 0
 	err = motor.ResetZeroPosition(ctx, 0, nil)
@@ -117,8 +123,9 @@ func TestGoTo(t *testing.T) {
 
 func TestPosition(t *testing.T) {
 	distance := 0.1 // revolutions to travel
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	// First reset the position to 0
 	err = motor.ResetZeroPosition(ctx, 0, nil)
@@ -152,7 +159,7 @@ func TestPosition(t *testing.T) {
 
 	position, err = motor.Position(ctx, nil)
 	assert.Nil(t, err, "error getting position")
-	assert.Equal(t, float64(-1), position)
+	assert.Equal(t, -1.0, position)
 
 	err = motor.GoFor(ctx, 600, 1, nil)
 	assert.Nil(t, err, "error executing move command")
@@ -163,8 +170,10 @@ func TestPosition(t *testing.T) {
 }
 
 func TestDoCommand(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
+
 	_, err = motor.DoCommand(ctx, map[string]interface{}{"command": "DI20000"})
 	assert.Nil(t, err, "error executing do command")
 	_, err = motor.DoCommand(ctx, map[string]interface{}{"command": "VE1"})
@@ -179,8 +188,9 @@ func TestDoCommand(t *testing.T) {
 }
 
 func TestAccelOverrides(t *testing.T) {
-	ctx, motor, err := getMotorForTesting(t)
+	ctx, motor, err := getMotorForTesting(t, getDefaultConfig())
 	assert.Nil(t, err, "failed to construct motor")
+	defer motor.Close(ctx)
 
 	// Since we're moving a real motor, we can use real time to see how fast it's going.
 	t1 := time.Now()
@@ -196,4 +206,90 @@ func TestAccelOverrides(t *testing.T) {
 
 	assert.Greater(t, t3.Sub(t2), 2 * t1.Sub(t2)) // Slow acceleration takes longer than default
 	assert.Greater(t, t4.Sub(t3), 2 * t1.Sub(t2)) // Slow deceleration takes longer than default, too
+}
+
+func TestAccelLimits(t *testing.T) {
+	// Start with a helper that takes a Config and returns how long it took to turn the motor 1
+	// revolution at a standard speed.
+	timeRevolution := func(
+		config *Config, description string, extra map[string]interface{},
+	) time.Duration {
+		ctx, motor, err := getMotorForTesting(t, config)
+		assert.Nil(t, err, "failed to construct motor")
+		defer motor.Close(ctx)
+
+		start := time.Now()
+		err = motor.GoFor(ctx, 600, 1, extra)
+		assert.Nil(t, err, description)
+		end := time.Now()
+		return end.Sub(start)
+	}
+
+	assertApproximatelyEqual := func(a, b time.Duration, message string) {
+		tolerance := 0.07 // Fraction of values that can differ
+		assert.Greater(t, time.Duration((1 + tolerance) * float64(a)), b, message)
+		assert.Greater(t, time.Duration((1 + tolerance) * float64(b)), a, message)
+	}
+
+	conf := getDefaultConfig()
+	defaultTime := timeRevolution(conf, "default config", nil)
+
+	// If you try to set accel/decel values out of range, clamp it to the min/max.
+
+	conf = getDefaultConfig() // Reset anything changed in a previous test
+	conf.MinAcceleration = 100
+	clampedMinAccelTime := timeRevolution(conf, "setting acceleration below minimum",
+	                                      map[string]interface{}{"acceleration": 10.0})
+	assertApproximatelyEqual(defaultTime, clampedMinAccelTime, "acceleration below minimum")
+
+	conf = getDefaultConfig()
+	conf.MaxAcceleration = 100
+	clampedMaxAccelTime := timeRevolution(conf, "setting acceleration above maximum",
+	                                      map[string]interface{}{"acceleration": 200.0})
+	assertApproximatelyEqual(defaultTime, clampedMaxAccelTime, "acceleration above maximum")
+
+	conf = getDefaultConfig()
+	conf.MinDeceleration = 100
+	clampedMinDecelTime := timeRevolution(conf, "setting deceleration below minimum",
+	                                      map[string]interface{}{"deceleration": 10.0})
+	assertApproximatelyEqual(defaultTime, clampedMinDecelTime, "deceleration below minimum")
+
+	conf = getDefaultConfig()
+	conf.MaxDeceleration = 100
+	clampedMaxDecelTime := timeRevolution(conf, "setting deceleration above maximum",
+	                                      map[string]interface{}{"deceleration": 200.0})
+	assertApproximatelyEqual(defaultTime, clampedMaxDecelTime, "deceleration above maximum")
+
+	// but clamping shouldn't affect values within the valid range!
+	conf = getDefaultConfig()
+	conf.MinAcceleration = 1
+	conf.MinDeceleration = 1
+	unclampedMinAccelTime := timeRevolution(conf, "setting acceleration below minimum",
+	                                        map[string]interface{}{"acceleration": 10.0})
+	assert.Greater(t, unclampedMinAccelTime, 2 * defaultTime)
+	unclampedMinDecelTime := timeRevolution(conf, "setting deceleration below minimum",
+	                                        map[string]interface{}{"deceleration": 10.0})
+	assert.Greater(t, unclampedMinDecelTime, 2 * defaultTime)
+
+	// Increasing the maximum acceleration above 100 rev/sec^2 doesn't seem to appreciably affect
+	// the total move time. So instead, let's lower the default acceleration and make sure that you
+	// can set it fast again anyway.
+	conf = getDefaultConfig()
+	conf.DefaultAcceleration = 10
+	conf.DefaultDeceleration = 10
+	slowAccelDefaultTime := timeRevolution(conf, "slow accel config", nil)
+
+	conf = getDefaultConfig()
+	conf.DefaultAcceleration = 10
+	conf.MaxAcceleration = 200
+	unclampedMaxAccelTime := timeRevolution(conf, "setting acceleration above maximum",
+	                                        map[string]interface{}{"acceleration": 100.0})
+	assert.Greater(t, slowAccelDefaultTime, 2 * unclampedMaxAccelTime)
+
+	conf = getDefaultConfig()
+	conf.DefaultDeceleration = 10
+	conf.MaxDeceleration = 200
+	unclampedMaxDecelTime := timeRevolution(conf, "setting deceleration above maximum",
+	                                        map[string]interface{}{"deceleration": 100.0})
+	assert.Greater(t, slowAccelDefaultTime, 2 * unclampedMaxDecelTime)
 }
