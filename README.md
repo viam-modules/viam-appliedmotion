@@ -34,8 +34,8 @@ Support has been explicity tested on the STF10-IP, and support for RS485 has bee
 | acceleration* | float64 | The default acceleration rate to use for the start of move commands |
 | deceleration* | float64 | The default deceleration rate to use for the end of move commands and explicit stop commands |
 | min_acceleration* | float64 | The minimum acceleration rate to use for the start of move commands. Set this to 0 to not enforce any minimum value. |
-| min_deceleration* | float64 | The minimum deceleration rate to use for the end of move commands and explicit stop commands. Set this to 0 to not enforce any minimum value. |
 | max_acceleration* | float64 | The maximum acceleration rate to use for the start of move commands. Set this to 0 to not enforce any maximum value. |
+| min_deceleration* | float64 | The minimum deceleration rate to use for the end of move commands and explicit stop commands. Set this to 0 to not enforce any minimum value. |
 | max_deceleration* | float64 | The maximum deceleration rate to use for the end of move commands and explicit stop commands. Set this to 0 to not enforce any maximum value. |
 
 _*Denotes configuration value is optional_
