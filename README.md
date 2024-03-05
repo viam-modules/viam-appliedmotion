@@ -47,3 +47,7 @@ Assuming you set the dial on the side of the controller to a static IP address s
 ## Using extra parameters in the movement RPCs
 
 In the `GoTo` and `GoFor` commands, you can optionally set the `"acceleration"` and `"deceleration"` in the `extra` parameters. If you set either (or both!) of them, they should be 64-bit floating point numbers (sometimes called doubles), describing the acceleration/deceleration to use in revolutions per second^2. If you have also set the minimum or maximum acceleration/deceleration in the config, and the `extra` value falls outside the allowable range, we will instead use the minimum or maximum (depending on whether the `extra` value was too low or too high, respectively).
+
+## Unspecified parameters
+
+Any parameters not explicitly set (e.g., if you don't specify the acceleration, or you're interested in the torque ripple threshold which we don't support at all) will use whatever value was previously stored on the motor controller. This means you can use `DoCommand` to send raw values to the motor controller for all the extra parts you're interested in, and they will be respected by later movement commands.
