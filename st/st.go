@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -107,11 +106,8 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 		if err := s.comm.store(ctx, "DE", deceleration); err != nil {
 			return err
 		}
-	}
-	// Set the maximum deceleration when stopping a move in the middle, too.
-	stopDecel := math.Max(acceleration, deceleration)
-	if stopDecel > 0 {
-		if err := s.comm.store(ctx, "AM", stopDecel); err != nil {
+		// Set the maximum deceleration when stopping a move in the middle, too.
+		if err := s.comm.store(ctx, "AM", deceleration); err != nil {
 			return err
 		}
 	}
