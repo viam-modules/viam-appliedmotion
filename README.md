@@ -51,3 +51,7 @@ In the `GoTo` and `GoFor` commands, you can optionally set the `"acceleration"` 
 ## Unspecified parameters
 
 Any parameters not explicitly set (e.g., if you don't specify the acceleration, or you're interested in the torque ripple threshold which we don't support at all) will use whatever value was previously stored on the motor controller. This means you can use `DoCommand` to send raw values to the motor controller for all the extra parts you're interested in, and they will be respected by later movement commands.
+
+For a description of the raw instructions you could send to the motor using `DoCommand`, see [the manual](https://appliedmotion.s3.amazonaws.com/Host-Command-Reference_920-0002W_0.pdf) for this hardware.
+
+We will take care of the extra formatting: just put a `"AC100"` or similar in the `"command"` key of a `DoCommand`, without the null byte or bell at the beginning and without the carriage return at the end. We'll send back the result in the `"response"` key, again with the formatting bytes stripped out.
