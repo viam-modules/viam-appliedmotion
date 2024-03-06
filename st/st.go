@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -107,11 +106,8 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 		if err := s.comm.store(ctx, "DE", deceleration); err != nil {
 			return err
 		}
-	}
-	// Set the maximum deceleration when stopping a move in the middle, too.
-	stopDecel := math.Max(acceleration, deceleration)
-	if stopDecel > 0 {
-		if err := s.comm.store(ctx, "AM", stopDecel); err != nil {
+		// Set the maximum deceleration when stopping a move in the middle, too.
+		if err := s.comm.store(ctx, "AM", deceleration); err != nil {
 			return err
 		}
 	}
@@ -412,8 +408,10 @@ func (s *st) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 // SetPower implements motor.Motor.
 func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
 	// We could tell it to move at a certain speed for a very large number of rotations, but that's
-	// as close as this motor gets to having a "set power" function. A sketch of that
-	// implementation is commented out below.
+	// as close as this motor gets to having a "set power" function, and that will stop moving
+	// after a while and won't actually do the right thing.
+	// TODO: consider using a FS command to go until a sensor (limit switch?) is tripped, and
+	// specifying a sensor that is not plugged in and will never trip.
 	return errors.New("set power is not supported for this motor")
 }
 

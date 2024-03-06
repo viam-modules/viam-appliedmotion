@@ -22,8 +22,8 @@ type Config struct {
 	DefaultAcceleration float64 `json:"acceleration,omitempty"`
 	DefaultDeceleration float64 `json:"deceleration,omitempty"`
 	MinAcceleration     float64 `json:"min_acceleration,omitempty"`
-	MinDeceleration     float64 `json:"min_deceleration,omitempty"`
 	MaxAcceleration     float64 `json:"max_acceleration,omitempty"`
+	MinDeceleration     float64 `json:"min_deceleration,omitempty"`
 	MaxDeceleration     float64 `json:"max_deceleration,omitempty"`
 }
 
@@ -85,8 +85,8 @@ func (conf *Config) Validate(path string) ([]string, error) {
 		checkNonNegative(conf.DefaultAcceleration, "acceleration"),
 		checkNonNegative(conf.DefaultDeceleration, "acceleration"),
 		checkNonNegative(conf.MinAcceleration, "min_acceleration"),
-		checkNonNegative(conf.MinDeceleration, "min_acceleration"),
 		checkNonNegative(conf.MaxAcceleration, "max_deceleration"),
+		checkNonNegative(conf.MinDeceleration, "min_acceleration"),
 		checkNonNegative(conf.MaxDeceleration, "max_deceleration"),
 	)
 }
