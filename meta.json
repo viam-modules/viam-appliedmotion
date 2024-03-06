@@ -1,5 +1,5 @@
 {
-  "name": "viam-labs:viam-appliedmotion",
+  "module_id": "viam-labs:viam-appliedmotion",
   "visibility": "public",
   "url": "https://github.com/viam-labs/viam-appliedmotion",
   "description": "A modular component for Applied Motion Motor Controllers",
