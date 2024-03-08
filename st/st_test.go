@@ -293,3 +293,26 @@ func TestAccelLimits(t *testing.T) {
 	                                        map[string]interface{}{"deceleration": 100.0})
 	assert.Greater(t, slowAccelDefaultTime, 2 * unclampedMaxDecelTime)
 }
+
+func TestRpmLimits(t *testing.T) {
+	conf := getDefaultConfig()
+	defaultTime := timeRevolution(t, conf, 600, "default config", nil)
+
+	// If you try to set RPM values out of range, clamp it to the min/max.
+	conf = getDefaultConfig()
+	conf.MinRpm = 600
+	clampedMinRpmTime := timeRevolution(t, conf, 100, "setting rpm below minimum", nil)
+	assertApproximatelyEqual(t, defaultTime, clampedMinRpmTime, "rpm below minimum")
+
+	conf = getDefaultConfig()
+	conf.MaxRpm = 600
+	clampedMaxRpmTime := timeRevolution(t, conf, 1000, "setting rpm above maximum", nil)
+	assertApproximatelyEqual(t, defaultTime, clampedMaxRpmTime, "acceleration above maximum")
+
+	// but if you're in the right range, it's okay to go that speed.
+	conf = getDefaultConfig()
+	conf.MinRpm = 10
+	conf.MaxRpm = 1000
+	slowRpmTime := timeRevolution(t, conf, 100, "setting rpm slower", nil)
+	assert.Greater(t, slowRpmTime, 2 * defaultTime)
+}
