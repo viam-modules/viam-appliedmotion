@@ -78,10 +78,10 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	return nil, multierr.Combine(
 		checkLessThan(conf.MinAcceleration,     conf.MaxAcceleration,     "ac", "min_", "max_"),
 		checkLessThan(conf.MinAcceleration,     conf.DefaultAcceleration, "ac", "min_", ""),
-		checkLessThan(conf.DefaultAcceleration, conf.MaxAcceleration,     "ac", "",     "max_"),
+		checkLessThan(conf.DefaultAcceleration, conf.MaxAcceleration,     "ac", "default_", "max_"),
 		checkLessThan(conf.MinDeceleration,     conf.MaxDeceleration,     "de", "min_", "max_"),
-		checkLessThan(conf.MinDeceleration,     conf.DefaultDeceleration, "de", "min_", ""),
-		checkLessThan(conf.DefaultDeceleration, conf.MaxDeceleration,     "de", "",     "max_"),
+		checkLessThan(conf.MinDeceleration,     conf.DefaultDeceleration, "de", "min_", "default_"),
+		checkLessThan(conf.DefaultDeceleration, conf.MaxDeceleration,     "de", "default_", "max_"),
 		checkNonNegative(conf.DefaultAcceleration, "accel"),
 		checkNonNegative(conf.DefaultDeceleration, "decel"),
 		checkNonNegative(conf.MinAcceleration, "min_accel"),
