@@ -25,18 +25,18 @@ Support has been explicity tested on the STF10-IP, and support for RS485 has bee
 ## Configuration
 | Variable | DataType | Notes |
 | -------- | -------- | ----- |
-| protocol | string   | *Required* The protocol to use for communicating with the controller. Acceptable values are `ip`, `rs485`, and `rs232` |
-| uri      | string   | *Required* Either the IP address or the path to the `rs232`/`rs485` interface on linux |
-| min_rpm  | float64  | The minimum RPM that this motor can run |
-| max_rpm  | float64  | The maximum RPM that this motor can run |
-| steps_per_rev | int64 | The number of pulses required to drive the motor one revolution. This is configured in the drive using the Applied Motion software |
-| connect_timeout* | int64 | The number of seconds to wait for the drive to respond |
-| default_accel_revs_per_sec_squared | float64 | The default acceleration rate to use for the start of move commands |
-| default_decel_revs_per_sec_squared | float64 | The default deceleration rate to use for the end of move commands and explicit stop commands |
-| min_accel_revs_per_sec_squared | float64 | The minimum acceleration rate to use for the start of move commands. Set this to 0 to not enforce any minimum value. |
-| max_accel_revs_per_sec_squared | float64 | The maximum acceleration rate to use for the start of move commands. Set this to 0 to not enforce any maximum value. |
-| min_decel_revs_per_sec_squared | float64 | The minimum deceleration rate to use for the end of move commands and explicit stop commands. Set this to 0 to not enforce any minimum value. |
-| max_decel_revs_per_sec_squared | float64 | The maximum deceleration rate to use for the end of move commands and explicit stop commands. Set this to 0 to not enforce any maximum value. |
+| protocol | string   | *Required* | The protocol to use for communicating with the controller. Acceptable values are `ip`, `rs485`, and `rs232` |
+| uri      | string   | *Required* | Either the IP address or the path to the `rs232`/`rs485` interface on linux |
+| min_rpm  | float64  | Optional | The minimum RPM that this motor can run |
+| max_rpm  | float64  | Optional | The maximum RPM that this motor can run |
+| steps_per_rev | int64 | Optional | The number of pulses required to drive the motor one revolution. This is configured in the drive using the Applied Motion software |
+| connect_timeout* | int64 | Optional | The number of seconds to wait for the drive to respond |
+| default_accel_revs_per_sec_squared | float64 | Optional | The default acceleration rate to use for the start of move commands |
+| default_decel_revs_per_sec_squared | float64 | Optional | The default deceleration rate to use for the end of move commands and explicit stop commands |
+| min_accel_revs_per_sec_squared | float64 | Optional | The minimum acceleration rate to use for the start of move commands. Set this to 0 to not enforce any minimum value. |
+| max_accel_revs_per_sec_squared | float64 | Optional | The maximum acceleration rate to use for the start of move commands. Set this to 0 to not enforce any maximum value. |
+| min_decel_revs_per_sec_squared | float64 | Optional | The minimum deceleration rate to use for the end of move commands and explicit stop commands. Set this to 0 to not enforce any minimum value. |
+| max_decel_revs_per_sec_squared | float64 | Optional | The maximum deceleration rate to use for the end of move commands and explicit stop commands. Set this to 0 to not enforce any maximum value. |
 
 ## Network Setup (for ethernet-connected motor controllers like the STF10-IP)
 
