@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"go.uber.org/multierr"
-	"go.viam.com/rdk/utils"
 )
 
 type Config struct {
@@ -13,8 +12,8 @@ type Config struct {
 	Uri            string `json:"uri"`
 	ConnectTimeout int64  `json:"connect_timeout,omitempty"`
 
-	StepsPerRev int64 `json:"steps_per_rev"`
-	MaxRpm              float64 `json:"max_rpm"`
+	StepsPerRev int64   `json:"steps_per_rev"`
+	MaxRpm      float64 `json:"max_rpm"`
 
 	// Optional motion control values
 	MinRpm              float64 `json:"min_rpm,omitempty"`
@@ -42,7 +41,7 @@ func (conf *Config) Validate(path string) ([]string, error) {
 		return nil, errors.New("max_rpm must be > 0")
 	}
 
-	// RPM checks - this check will be removed when a PR is made to 
+	// RPM checks - this check will be removed when a PR is made to
 	// implement the logic for an unset minRPM
 	if conf.MinRpm < 0 {
 		return nil, errors.New("min_rpm must be >= 0")
@@ -78,12 +77,12 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	}
 
 	return nil, multierr.Combine(
-		checkLessThan(conf.MinAcceleration,     conf.MaxAcceleration,     "ac", "min_", "max_"),
-		checkLessThan(conf.MinAcceleration,     conf.DefaultAcceleration, "ac", "min_", ""),
-		checkLessThan(conf.DefaultAcceleration, conf.MaxAcceleration,     "ac", "default_", "max_"),
-		checkLessThan(conf.MinDeceleration,     conf.MaxDeceleration,     "de", "min_", "max_"),
-		checkLessThan(conf.MinDeceleration,     conf.DefaultDeceleration, "de", "min_", "default_"),
-		checkLessThan(conf.DefaultDeceleration, conf.MaxDeceleration,     "de", "default_", "max_"),
+		checkLessThan(conf.MinAcceleration, conf.MaxAcceleration, "ac", "min_", "max_"),
+		checkLessThan(conf.MinAcceleration, conf.DefaultAcceleration, "ac", "min_", ""),
+		checkLessThan(conf.DefaultAcceleration, conf.MaxAcceleration, "ac", "default_", "max_"),
+		checkLessThan(conf.MinDeceleration, conf.MaxDeceleration, "de", "min_", "max_"),
+		checkLessThan(conf.MinDeceleration, conf.DefaultDeceleration, "de", "min_", "default_"),
+		checkLessThan(conf.DefaultDeceleration, conf.MaxDeceleration, "de", "default_", "max_"),
 		checkNonNegative(conf.DefaultAcceleration, "accel"),
 		checkNonNegative(conf.DefaultDeceleration, "decel"),
 		checkNonNegative(conf.MinAcceleration, "min_accel"),
