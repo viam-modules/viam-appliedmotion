@@ -9,16 +9,15 @@ import (
 )
 
 type Config struct {
-	Attributes utils.AttributeMap `json:"attributes,omitempty"`
-
 	Protocol       string `json:"protocol"`
 	Uri            string `json:"uri"`
 	ConnectTimeout int64  `json:"connect_timeout,omitempty"`
 
 	StepsPerRev int64 `json:"steps_per_rev"`
-
-	MinRpm              float64 `json:"min_rpm"`
 	MaxRpm              float64 `json:"max_rpm"`
+
+	// Optional motion control values
+	MinRpm              float64 `json:"min_rpm,omitempty"`
 	DefaultAcceleration float64 `json:"default_accel_revs_per_sec_squared,omitempty"`
 	DefaultDeceleration float64 `json:"default_decel_revs_per_sec_squared,omitempty"`
 	MinAcceleration     float64 `json:"min_accel_revs_per_sec_squared,omitempty"`
@@ -39,14 +38,17 @@ func (conf *Config) Validate(path string) ([]string, error) {
 		return nil, errors.New("steps_per_rev must be > 0")
 	}
 
-	// RPM checks
+	if conf.MaxRpm <= 0 {
+		return nil, errors.New("max_rpm must be > 0")
+	}
+
+	// RPM checks - this check will be removed when a PR is made to 
+	// implement the logic for an unset minRPM
 	if conf.MinRpm < 0 {
 		return nil, errors.New("min_rpm must be >= 0")
 	}
-	if conf.MaxRpm < 0 {
-		return nil, errors.New("max_rpm must be >= 0")
-	}
-	if conf.MaxRpm != 0 && conf.MaxRpm < conf.MinRpm {
+
+	if conf.MaxRpm < conf.MinRpm && conf.MaxRpm < conf.MinRpm  {
 		return nil, errors.New("max_rpm must be >= min_rpm")
 	}
 
