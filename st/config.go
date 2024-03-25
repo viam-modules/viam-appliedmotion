@@ -37,6 +37,7 @@ func (conf *Config) Validate(path string) ([]string, error) {
 		return nil, errors.New("steps_per_rev must be > 0")
 	}
 
+	// RPM checks
 	if conf.MaxRpm <= 0 {
 		return nil, errors.New("max_rpm must be > 0")
 	}
