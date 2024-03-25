@@ -5,26 +5,24 @@ import (
 	"fmt"
 
 	"go.uber.org/multierr"
-	"go.viam.com/rdk/utils"
 )
 
 type Config struct {
-	Attributes utils.AttributeMap `json:"attributes,omitempty"`
-
 	Protocol       string `json:"protocol"`
 	Uri            string `json:"uri"`
 	ConnectTimeout int64  `json:"connect_timeout,omitempty"`
 
-	StepsPerRev int64 `json:"steps_per_rev"`
+	StepsPerRev int64   `json:"steps_per_rev"`
+	MaxRpm      float64 `json:"max_rpm"`
 
+	// Optional motion control values
 	MinRpm              float64 `json:"min_rpm,omitempty"`
-	MaxRpm              float64 `json:"max_rpm,omitempty"`
-	DefaultAcceleration float64 `json:"acceleration,omitempty"`
-	DefaultDeceleration float64 `json:"deceleration,omitempty"`
-	MinAcceleration     float64 `json:"min_acceleration,omitempty"`
-	MaxAcceleration     float64 `json:"max_acceleration,omitempty"`
-	MinDeceleration     float64 `json:"min_deceleration,omitempty"`
-	MaxDeceleration     float64 `json:"max_deceleration,omitempty"`
+	DefaultAcceleration float64 `json:"default_accel_revs_per_sec_squared,omitempty"`
+	DefaultDeceleration float64 `json:"default_decel_revs_per_sec_squared,omitempty"`
+	MinAcceleration     float64 `json:"min_accel_revs_per_sec_squared,omitempty"`
+	MaxAcceleration     float64 `json:"max_accel_revs_per_sec_squared,omitempty"`
+	MinDeceleration     float64 `json:"min_decel_revs_per_sec_squared,omitempty"`
+	MaxDeceleration     float64 `json:"max_decel_revs_per_sec_squared,omitempty"`
 }
 
 // Validate ensures all parts of the config are valid.
@@ -40,12 +38,14 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	}
 
 	// RPM checks
+	if conf.MaxRpm <= 0 {
+		return nil, errors.New("max_rpm must be > 0")
+	}
+
 	if conf.MinRpm < 0 {
 		return nil, errors.New("min_rpm must be >= 0")
 	}
-	if conf.MaxRpm < 0 {
-		return nil, errors.New("max_rpm must be >= 0")
-	}
+
 	if conf.MaxRpm != 0 && conf.MaxRpm < conf.MinRpm {
 		return nil, errors.New("max_rpm must be >= min_rpm")
 	}
@@ -63,7 +63,7 @@ func (conf *Config) Validate(path string) ([]string, error) {
 			return nil
 		}
 		if a > b {
-			return fmt.Errorf("%s%sceleration must be <= %s%sceleration", prefixA, accelPrefix, prefixB, accelPrefix)
+			return fmt.Errorf("%s%scel_revs_per_sec_squared must be <= %s%scel_revs_per_sec_squared", prefixA, accelPrefix, prefixB, accelPrefix)
 		}
 		return nil
 	}
@@ -76,17 +76,17 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	}
 
 	return nil, multierr.Combine(
-		checkLessThan(conf.MinAcceleration,     conf.MaxAcceleration,     "ac", "min_", "max_"),
-		checkLessThan(conf.MinAcceleration,     conf.DefaultAcceleration, "ac", "min_", ""),
-		checkLessThan(conf.DefaultAcceleration, conf.MaxAcceleration,     "ac", "",     "max_"),
-		checkLessThan(conf.MinDeceleration,     conf.MaxDeceleration,     "de", "min_", "max_"),
-		checkLessThan(conf.MinDeceleration,     conf.DefaultDeceleration, "de", "min_", ""),
-		checkLessThan(conf.DefaultDeceleration, conf.MaxDeceleration,     "de", "",     "max_"),
-		checkNonNegative(conf.DefaultAcceleration, "acceleration"),
-		checkNonNegative(conf.DefaultDeceleration, "acceleration"),
-		checkNonNegative(conf.MinAcceleration, "min_acceleration"),
-		checkNonNegative(conf.MaxAcceleration, "max_deceleration"),
-		checkNonNegative(conf.MinDeceleration, "min_acceleration"),
-		checkNonNegative(conf.MaxDeceleration, "max_deceleration"),
+		checkLessThan(conf.MinAcceleration, conf.MaxAcceleration, "ac", "min_", "max_"),
+		checkLessThan(conf.MinAcceleration, conf.DefaultAcceleration, "ac", "min_", ""),
+		checkLessThan(conf.DefaultAcceleration, conf.MaxAcceleration, "ac", "default_", "max_"),
+		checkLessThan(conf.MinDeceleration, conf.MaxDeceleration, "de", "min_", "max_"),
+		checkLessThan(conf.MinDeceleration, conf.DefaultDeceleration, "de", "min_", "default_"),
+		checkLessThan(conf.DefaultDeceleration, conf.MaxDeceleration, "de", "default_", "max_"),
+		checkNonNegative(conf.DefaultAcceleration, "accel"),
+		checkNonNegative(conf.DefaultDeceleration, "decel"),
+		checkNonNegative(conf.MinAcceleration, "min_accel"),
+		checkNonNegative(conf.MaxAcceleration, "max_decel"),
+		checkNonNegative(conf.MinDeceleration, "min_accel"),
+		checkNonNegative(conf.MaxDeceleration, "max_decel"),
 	)
 }
