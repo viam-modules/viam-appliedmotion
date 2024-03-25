@@ -41,13 +41,11 @@ func (conf *Config) Validate(path string) ([]string, error) {
 		return nil, errors.New("max_rpm must be > 0")
 	}
 
-	// RPM checks - this check will be removed when a PR is made to
-	// implement the logic for an unset minRPM
 	if conf.MinRpm < 0 {
 		return nil, errors.New("min_rpm must be >= 0")
 	}
 
-	if conf.MaxRpm < conf.MinRpm && conf.MaxRpm < conf.MinRpm  {
+	if conf.MaxRpm != 0 && conf.MaxRpm < conf.MinRpm {
 		return nil, errors.New("max_rpm must be >= min_rpm")
 	}
 
