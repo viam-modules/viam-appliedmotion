@@ -17,8 +17,8 @@ type Config struct {
 
 	StepsPerRev int64 `json:"steps_per_rev"`
 
-	MinRpm              float64 `json:"min_rpm"`
-	MaxRpm              float64 `json:"max_rpm"`
+	MinRpm              float64 `json:"min_rpm,omitempty"`
+	MaxRpm              float64 `json:"max_rpm,omitempty"`
 	DefaultAcceleration float64 `json:"acceleration,omitempty"`
 	DefaultDeceleration float64 `json:"deceleration,omitempty"`
 	MinAcceleration     float64 `json:"min_acceleration,omitempty"`
@@ -43,10 +43,10 @@ func (conf *Config) Validate(path string) ([]string, error) {
 	if conf.MinRpm < 0 {
 		return nil, errors.New("min_rpm must be >= 0")
 	}
-	if conf.MaxRpm <= 0 {
-		return nil, errors.New("max_rpm must be > 0")
+	if conf.MaxRpm < 0 {
+		return nil, errors.New("max_rpm must be >= 0")
 	}
-	if conf.MaxRpm < conf.MinRpm {
+	if conf.MaxRpm != 0 && conf.MaxRpm < conf.MinRpm {
 		return nil, errors.New("max_rpm must be >= min_rpm")
 	}
 
