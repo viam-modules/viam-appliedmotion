@@ -64,7 +64,7 @@ func (conf *Config) Validate(path string) ([]string, error) {
 			return nil
 		}
 		if a > b {
-			return fmt.Errorf("%s%sceleration must be <= %s%sceleration", prefixA, accelPrefix, prefixB, accelPrefix)
+			return fmt.Errorf("%s%scel_revs_per_sec_squared must be <= %s%scel_revs_per_sec_squared", prefixA, accelPrefix, prefixB, accelPrefix)
 		}
 		return nil
 	}
