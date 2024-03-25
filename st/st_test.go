@@ -307,7 +307,7 @@ func TestRpmLimits(t *testing.T) {
 	conf = getDefaultConfig()
 	conf.MaxRpm = 600
 	clampedMaxRpmTime := timeRevolution(t, conf, 1000, "setting rpm above maximum", nil)
-	assertApproximatelyEqual(t, defaultTime, clampedMaxRpmTime, "acceleration above maximum")
+	assertApproximatelyEqual(t, defaultTime, clampedMaxRpmTime, "rpm above maximum")
 
 	// but if you're in the right range, it's okay to go that speed.
 	conf = getDefaultConfig()
