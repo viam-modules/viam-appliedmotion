@@ -416,14 +416,52 @@ func (s *st) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 	return nil
 }
 
-// SetPower implements motor.Motor.
+// SetPower implements motor.Motor. We use the Continuous Jogging interface on the motor.
 func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
-	// We could tell it to move at a certain speed for a very large number of rotations, but that's
-	// as close as this motor gets to having a "set power" function, and that will stop moving
-	// after a while and won't actually do the right thing.
-	// TODO: consider using a FS command to go until a sensor (limit switch?) is tripped, and
-	// specifying a sensor that is not plugged in and will never trip.
-	return errors.New("set power is not supported for this motor")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// The GoTo and GoFor commands communicate the number of steps the motor should move, but
+	// SetPower requires telling the motor the number of revolutions per second the motor should
+	// spin at. Consequently, we need to tell it the number of steps per revolution, using the EG
+	// command.
+	if _, err := s.comm.send(ctx, fmt.Sprintf("EG%d", s.stepsPerRev)); err != nil {
+		return err
+	}
+
+	// Set accel with JA
+	acceleration := s.defaultAccel
+	if value, ok := extra["acceleration"]; ok {
+		acceleration = value
+	}
+	acceleration := s.accelLimits.Bound(acceleration, s.logger)
+	if _, err := s.comm.send(ctx, fmt.Sprintf("JA%f", acceleration)); err != nil {
+		return err
+	}
+
+	// Set decel with JL
+	deceleration := s.defaultAccel
+	if value, ok := extra["deceleration"]; ok {
+		deceleration = value
+	}
+	deceleration := s.decelLimits.Bound(deceleration, s.logger)
+	if _, err := s.comm.send(ctx, fmt.Sprintf("JL%f", deceleration)); err != nil {
+		return err
+	}
+
+	// Set speed with JS *and* CS. JS is for when we're not yet moving, and CS is for when we are.
+	targetRPM := powerPct * s.rpmLimits.max
+	if _, err := s.comm.send(ctx, fmt.Sprintf("JS%f", targetRPM)); err != nil {
+		return err
+	}
+	if _, err := s.comm.send(ctx, fmt.Sprintf("CS%f", targetRPM)); err != nil {
+		return err
+	}
+
+	// If we're not already moving, start with CJ
+	if _, err := s.comm.send(ctx, "CJ"); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Stop implements motor.Motor.
