@@ -43,6 +43,10 @@ func setOverrides(
 	// This function does the heavy lifting of writing to the device and updating err. It returns
 	// values to put into the old state.
 	store := func (value float64, command string) float64 {
+		if value == 0.0 {
+			return 0.0 // Don't change anything
+		}
+
 		response, sendErr := replaceValue(ctx, comms, command, value)
 		err = multierr.Combine(err, sendErr)
 		if response[:3] != command + "=" {

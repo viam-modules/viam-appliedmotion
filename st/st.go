@@ -446,18 +446,21 @@ func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 	}
 
 	// Set speed with JS *and* CS. JS is for when we're not yet moving, and CS is for when we are.
-	targetRPM := powerPct * s.rpmLimits.max
-	if _, err := s.comm.send(ctx, fmt.Sprintf("JS%f", targetRPM)); err != nil {
-		return err
-	}
-	if _, err := s.comm.send(ctx, fmt.Sprintf("CS%f", targetRPM)); err != nil {
-		return err
-	}
+	targetRPS := powerPct * s.rpmLimits.max / 60.0 // Revolutions per second, not per minute!
 
+	s.logger.Infof("powerpct: %v, max: %v, target: %v", powerPct, s.rpmLimits.max, targetRPS)
+	if _, err := s.comm.send(ctx, fmt.Sprintf("JS%f", targetRPS)); err != nil {
+		return err
+	}
 	// If we're not already moving, start with CJ
 	if _, err := s.comm.send(ctx, "CJ"); err != nil {
 		return err
 	}
+	if _, err := s.comm.send(ctx, fmt.Sprintf("CS%f", targetRPS)); err != nil {
+		return err
+	}
+
+	s.logger.Infof("successfully finished SetPower!")
 	return nil
 }
 
