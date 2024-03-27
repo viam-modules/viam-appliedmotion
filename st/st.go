@@ -141,6 +141,11 @@ func getComm(ctx context.Context, conf *Config, logger golog.Logger) (commPort, 
 	}
 }
 
+func (s *st) stopContinuousMovement() error {
+	_, err := s.comm.send(ctx, "SJ")
+	return err
+}
+
 func (s *st) getStatus(ctx context.Context) ([]byte, error) {
 	if resp, err := s.comm.send(ctx, "SC"); err != nil {
 		return nil, err
@@ -235,9 +240,8 @@ func (s *st) isBufferEmpty(ctx context.Context) (bool, error) {
 func (s *st) Close(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	s.logger.Debug("Closing comm port")
-	return s.comm.Close()
+	return multierr.Combine(s.stopContinuousMovement(),
+	                        s.comm.Close())
 }
 
 func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
@@ -276,6 +280,10 @@ func (s *st) configuredMove(
 	positionRevolutions, rpm float64,
 	extra map[string]interface{},
 ) error {
+	if err := s.stopContinuousMovement(); err != nil {
+		return err
+	}
+
 	if val, exists := extra["acceleration"]; exists {
 		if valFloat, ok := val.(float64); ok {
 			extra["acceleration"] = s.accelLimits.Bound(valFloat, s.logger)
