@@ -142,6 +142,7 @@ func getComm(ctx context.Context, conf *Config, logger golog.Logger) (commPort, 
 }
 
 func (s *st) stopMovement(ctx context.Context) error {
+	// The only movement we might be in the middle of is continuous jogging from a SetPower.
 	// Naively, SJ should stop jogging and thus stop continuous movement. However, if you're
 	// jogging, then call SJ, then do a non-jogging movement (e.g., FL) and that movement
 	// completes, it resumes jogging for reasons Alan doesn't understand. The SK command stops and
@@ -325,7 +326,6 @@ func (s *st) configuredMove(
 	}
 	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
 	                        oldAcceleration.restore(ctx, s.comm))
-
 }
 
 func (s *st) IsMoving(ctx context.Context) (bool, error) {
@@ -438,13 +438,11 @@ func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 		return err
 	}
 
-	// Set accel with JA
 	acceleration = s.accelLimits.Bound(acceleration, s.logger)
 	if _, err := s.comm.send(ctx, fmt.Sprintf("JA%f", acceleration)); err != nil {
 		return err
 	}
 
-	// Set decel with JL
 	deceleration = s.decelLimits.Bound(deceleration, s.logger)
 	if _, err := s.comm.send(ctx, fmt.Sprintf("JL%f", deceleration)); err != nil {
 		return err
