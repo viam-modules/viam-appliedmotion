@@ -141,8 +141,12 @@ func getComm(ctx context.Context, conf *Config, logger golog.Logger) (commPort, 
 	}
 }
 
-func (s *st) stopContinuousMovement(ctx context.Context) error {
-	_, err := s.comm.send(ctx, "SJ")
+func (s *st) stopMovement(ctx context.Context) error {
+	// Naively, SJ should stop jogging and thus stop continuous movement. However, if you're
+	// jogging, then call SJ, then do a non-jogging movement (e.g., FL) and that movement
+	// completes, it resumes jogging for reasons Alan doesn't understand. The SK command stops and
+	// clears the queue, and then we don't re-commence jogging later.
+	_, err := s.comm.send(ctx, "SK")
 	return err
 }
 
@@ -240,7 +244,7 @@ func (s *st) isBufferEmpty(ctx context.Context) (bool, error) {
 func (s *st) Close(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return multierr.Combine(s.stopContinuousMovement(ctx),
+	return multierr.Combine(s.stopMovement(ctx),
 	                        s.comm.Close())
 }
 
@@ -280,7 +284,7 @@ func (s *st) configuredMove(
 	positionRevolutions, rpm float64,
 	extra map[string]interface{},
 ) error {
-	if err := s.stopContinuousMovement(ctx); err != nil {
+	if err := s.stopMovement(ctx); err != nil {
 		return err
 	}
 
@@ -321,6 +325,7 @@ func (s *st) configuredMove(
 	}
 	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
 	                        oldAcceleration.restore(ctx, s.comm))
+
 }
 
 func (s *st) IsMoving(ctx context.Context) (bool, error) {
@@ -445,14 +450,13 @@ func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 		return err
 	}
 
-	// Set speed with JS *and* CS. JS is for when we're not yet moving, and CS is for when we are.
 	targetRPS := powerPct * s.rpmLimits.max / 60.0 // Revolutions per second, not per minute!
 
-	s.logger.Infof("powerpct: %v, max: %v, target: %v", powerPct, s.rpmLimits.max, targetRPS)
-	if _, err := s.comm.send(ctx, fmt.Sprintf("JS%f", targetRPS)); err != nil {
-		return err
-	}
-	// If we're not already moving, start with CJ
+	// You might expect us to use DI to set the direction, JS to set the (unsigned) jogging speed,
+	// and then CJ to start continuous jogging. However, if you call SetPower again while we're
+	// already jogging, we need to use CS to set the new speed, which should be signed rather than
+	// using DI to change direction. This is much simpler if we just start jogging and then
+	// immediately set the (signed) velocity.
 	if _, err := s.comm.send(ctx, "CJ"); err != nil {
 		return err
 	}
@@ -460,7 +464,6 @@ func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 		return err
 	}
 
-	s.logger.Infof("successfully finished SetPower!")
 	return nil
 }
 
