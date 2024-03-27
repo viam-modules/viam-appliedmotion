@@ -29,7 +29,10 @@ type st struct {
 
 	accelLimits limits
 	decelLimits limits
-	rpmLimits limits
+	rpmLimits   limits
+
+	defaultAccel float64
+	defaultDecel float64
 }
 
 var ErrStatusMessageIncorrectLength = errors.New("status message incorrect length")
@@ -94,15 +97,15 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	s.decelLimits = newLimits("deceleration", newConf.MinDeceleration, newConf.MaxDeceleration)
 	s.rpmLimits = newLimits("rpm", newConf.MinRpm, newConf.MaxRpm)
 
-	acceleration := newConf.DefaultAcceleration
-	if acceleration > 0 {
+	s.defaultAccel = newConf.DefaultAcceleration
+	if s.defaultAccel > 0 {
 		if err := s.comm.store(ctx, "AC", acceleration); err != nil {
 			return err
 		}
 	}
 
-	deceleration := newConf.DefaultDeceleration
-	if deceleration > 0 {
+	s.defaultDecel := newConf.DefaultDeceleration
+	if s.defaultDecel > 0 {
 		if err := s.comm.store(ctx, "DE", deceleration); err != nil {
 			return err
 		}
