@@ -99,18 +99,18 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 
 	s.defaultAccel = newConf.DefaultAcceleration
 	if s.defaultAccel > 0 {
-		if err := s.comm.store(ctx, "AC", acceleration); err != nil {
+		if err := s.comm.store(ctx, "AC", s.defaultAccel); err != nil {
 			return err
 		}
 	}
 
-	s.defaultDecel := newConf.DefaultDeceleration
+	s.defaultDecel = newConf.DefaultDeceleration
 	if s.defaultDecel > 0 {
-		if err := s.comm.store(ctx, "DE", deceleration); err != nil {
+		if err := s.comm.store(ctx, "DE", s.defaultDecel); err != nil {
 			return err
 		}
 		// Set the maximum deceleration when stopping a move in the middle, too.
-		if err := s.comm.store(ctx, "AM", deceleration); err != nil {
+		if err := s.comm.store(ctx, "AM", s.defaultDecel); err != nil {
 			return err
 		}
 	}
@@ -141,7 +141,7 @@ func getComm(ctx context.Context, conf *Config, logger golog.Logger) (commPort, 
 	}
 }
 
-func (s *st) stopContinuousMovement() error {
+func (s *st) stopContinuousMovement(ctx context.Context) error {
 	_, err := s.comm.send(ctx, "SJ")
 	return err
 }
@@ -240,7 +240,7 @@ func (s *st) isBufferEmpty(ctx context.Context) (bool, error) {
 func (s *st) Close(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return multierr.Combine(s.stopContinuousMovement(),
+	return multierr.Combine(s.stopContinuousMovement(ctx),
 	                        s.comm.Close())
 }
 
@@ -280,7 +280,7 @@ func (s *st) configuredMove(
 	positionRevolutions, rpm float64,
 	extra map[string]interface{},
 ) error {
-	if err := s.stopContinuousMovement(); err != nil {
+	if err := s.stopContinuousMovement(ctx); err != nil {
 		return err
 	}
 
@@ -428,22 +428,19 @@ func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 		return err
 	}
 
-	// Set accel with JA
-	acceleration := s.defaultAccel
-	if value, ok := extra["acceleration"]; ok {
-		acceleration = value
+	acceleration, deceleration, err := convertExtras(extra)
+	if err != nil {
+		return err
 	}
-	acceleration := s.accelLimits.Bound(acceleration, s.logger)
+
+	// Set accel with JA
+	acceleration = s.accelLimits.Bound(acceleration, s.logger)
 	if _, err := s.comm.send(ctx, fmt.Sprintf("JA%f", acceleration)); err != nil {
 		return err
 	}
 
 	// Set decel with JL
-	deceleration := s.defaultAccel
-	if value, ok := extra["deceleration"]; ok {
-		deceleration = value
-	}
-	deceleration := s.decelLimits.Bound(deceleration, s.logger)
+	deceleration = s.decelLimits.Bound(deceleration, s.logger)
 	if _, err := s.comm.send(ctx, fmt.Sprintf("JL%f", deceleration)); err != nil {
 		return err
 	}

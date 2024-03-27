@@ -14,17 +14,14 @@ type oldAcceleration struct {
 	// Perhaps more parameters will go here.
 }
 
-func setOverrides(
-	ctx context.Context, comms commPort, extra map[string]interface{},
-) (oldAcceleration, error) {
+// Returns the accel/decel values from the extra map.
+func convertExtras(extra map[string]interface{}) (float64, float64, error) {
 	var err error
 
-	// This function does the heavy lifting of writing to the device and updating err. It returns
-	// values to put into the old state.
-	store := func (key, command string) float64 {
+	getValue := func(key string) float64 {
 		val, exists := extra[key]
 		if !exists {
-			return 0.0 // Use the default
+			return 0.0
 		}
 
 		realVal, ok := val.(float64)
@@ -32,13 +29,27 @@ func setOverrides(
 			err = multierr.Combine(err, fmt.Errorf("non-float64 value for %s: %#v", key, val))
 			return 0.0
 		}
-		response, sendErr := replaceValue(ctx, comms, command, realVal)
+		return realVal
+	}
+
+	return getValue("acceleration"), getValue("deceleration"), err
+}
+
+func setOverrides(
+	ctx context.Context, comms commPort, extra map[string]interface{},
+) (oldAcceleration, error) {
+	accel, decel, err := convertExtras(extra)
+
+	// This function does the heavy lifting of writing to the device and updating err. It returns
+	// values to put into the old state.
+	store := func (value float64, command string) float64 {
+		response, sendErr := replaceValue(ctx, comms, command, value)
 		err = multierr.Combine(err, sendErr)
 		if response[:3] != command + "=" {
 			// The response we got back does not match the request we sent (e.g., we sent an "AC"
 			// request but did not get an "AC=" response). Something has gone very wrong.
-			err = multierr.Combine(err, fmt.Errorf("unexpected response when storing %s: %#v",
-												   key, response))
+			err = multierr.Combine(err, fmt.Errorf("unexpected response to %s: %#v",
+												   command, response))
 			return 0.0
 		}
 
@@ -51,8 +62,8 @@ func setOverrides(
 	}
 
 	var os oldAcceleration
-	os.acceleration = store("acceleration", "AC")
-	os.deceleration = store("deceleration", "DE")
+	os.acceleration = store(accel, "AC")
+	os.deceleration = store(decel, "DE")
 	return os, err
 }
 
