@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -250,6 +251,13 @@ func (s *st) Close(ctx context.Context) error {
 }
 
 func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
+	if positionRevolutions == 0 {
+		// This is a special sentinel value to move forever.
+		powerLevel := rpm / s.rpmLimits.max
+		return s.SetPower(ctx, powerLevel, extra)
+	}
+
+	// Otherwise, do a normal GoFor.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
@@ -448,7 +456,20 @@ func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 		return err
 	}
 
-	targetRPS := powerPct * s.rpmLimits.max / 60.0 // Revolutions per second, not per minute!
+	// Make sure not to go past the maximum speed
+	if powerPct > 1.0 {
+		powerPct = 1.0
+	}
+	if powerPct < -1.0 {
+		powerPct = -1.0
+	}
+
+	targetRPM := powerPct * s.rpmLimits.max
+	if math.Abs(targetRPM) < s.rpmLimits.min {
+		return fmt.Errorf("refusing to set power to less than the minimum RPM (%f vs %f)",
+	                      targetRPM, s.rpmLimits.min)
+	}
+	targetRPS := targetRPM / 60.0 // Revolutions per second, not per minute!
 
 	// You might expect us to use DI to set the direction, JS to set the (unsigned) jogging speed,
 	// and then CJ to start continuous jogging. However, if you call SetPower again while we're
