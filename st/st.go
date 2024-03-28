@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,7 +30,10 @@ type st struct {
 
 	accelLimits limits
 	decelLimits limits
-	rpmLimits limits
+	rpmLimits   limits
+
+	defaultAccel float64
+	defaultDecel float64
 }
 
 var ErrStatusMessageIncorrectLength = errors.New("status message incorrect length")
@@ -94,20 +98,20 @@ func (s *st) Reconfigure(ctx context.Context, _ resource.Dependencies, conf reso
 	s.decelLimits = newLimits("deceleration", newConf.MinDeceleration, newConf.MaxDeceleration)
 	s.rpmLimits = newLimits("rpm", newConf.MinRpm, newConf.MaxRpm)
 
-	acceleration := newConf.DefaultAcceleration
-	if acceleration > 0 {
-		if err := s.comm.store(ctx, "AC", acceleration); err != nil {
+	s.defaultAccel = newConf.DefaultAcceleration
+	if s.defaultAccel > 0 {
+		if err := s.comm.store(ctx, "AC", s.defaultAccel); err != nil {
 			return err
 		}
 	}
 
-	deceleration := newConf.DefaultDeceleration
-	if deceleration > 0 {
-		if err := s.comm.store(ctx, "DE", deceleration); err != nil {
+	s.defaultDecel = newConf.DefaultDeceleration
+	if s.defaultDecel > 0 {
+		if err := s.comm.store(ctx, "DE", s.defaultDecel); err != nil {
 			return err
 		}
 		// Set the maximum deceleration when stopping a move in the middle, too.
-		if err := s.comm.store(ctx, "AM", deceleration); err != nil {
+		if err := s.comm.store(ctx, "AM", s.defaultDecel); err != nil {
 			return err
 		}
 	}
@@ -136,6 +140,16 @@ func getComm(ctx context.Context, conf *Config, logger golog.Logger) (commPort, 
 	default:
 		return nil, fmt.Errorf("unknown comm type %s", conf.Protocol)
 	}
+}
+
+func (s *st) stopMovement(ctx context.Context) error {
+	// The only movement we might be in the middle of is continuous jogging from a SetPower.
+	// Naively, SJ should stop jogging and thus stop continuous movement. However, if you're
+	// jogging, then call SJ, then do a non-jogging movement (e.g., FL) and that movement
+	// completes, it resumes jogging for reasons Alan doesn't understand. The SK command stops and
+	// clears the queue, and then we don't re-commence jogging later.
+	_, err := s.comm.send(ctx, "SK")
+	return err
 }
 
 func (s *st) getStatus(ctx context.Context) ([]byte, error) {
@@ -232,12 +246,18 @@ func (s *st) isBufferEmpty(ctx context.Context) (bool, error) {
 func (s *st) Close(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	s.logger.Debug("Closing comm port")
-	return s.comm.Close()
+	return multierr.Combine(s.stopMovement(ctx),
+	                        s.comm.Close())
 }
 
 func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
+	if positionRevolutions == 0 {
+		// This is a special sentinel value to move forever.
+		powerLevel := rpm / s.rpmLimits.max
+		return s.SetPower(ctx, powerLevel, extra)
+	}
+
+	// Otherwise, do a normal GoFor.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
@@ -273,6 +293,10 @@ func (s *st) configuredMove(
 	positionRevolutions, rpm float64,
 	extra map[string]interface{},
 ) error {
+	if err := s.stopMovement(ctx); err != nil {
+		return err
+	}
+
 	if val, exists := extra["acceleration"]; exists {
 		if valFloat, ok := val.(float64); ok {
 			extra["acceleration"] = s.accelLimits.Bound(valFloat, s.logger)
@@ -405,14 +429,61 @@ func (s *st) ResetZeroPosition(ctx context.Context, offset float64, extra map[st
 	return nil
 }
 
-// SetPower implements motor.Motor.
+// SetPower implements motor.Motor. We use the Continuous Jogging interface on the motor.
 func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]interface{}) error {
-	// We could tell it to move at a certain speed for a very large number of rotations, but that's
-	// as close as this motor gets to having a "set power" function, and that will stop moving
-	// after a while and won't actually do the right thing.
-	// TODO: consider using a FS command to go until a sensor (limit switch?) is tripped, and
-	// specifying a sensor that is not plugged in and will never trip.
-	return errors.New("set power is not supported for this motor")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	// The GoTo and GoFor commands communicate the number of steps the motor should move, but
+	// SetPower requires telling the motor the number of revolutions per second the motor should
+	// spin at. Consequently, we need to tell it the number of steps per revolution, using the EG
+	// command.
+	if _, err := s.comm.send(ctx, fmt.Sprintf("EG%d", s.stepsPerRev)); err != nil {
+		return err
+	}
+
+	acceleration, deceleration, err := convertExtras(extra)
+	if err != nil {
+		return err
+	}
+
+	acceleration = s.accelLimits.Bound(acceleration, s.logger)
+	if _, err := s.comm.send(ctx, fmt.Sprintf("JA%f", acceleration)); err != nil {
+		return err
+	}
+
+	deceleration = s.decelLimits.Bound(deceleration, s.logger)
+	if _, err := s.comm.send(ctx, fmt.Sprintf("JL%f", deceleration)); err != nil {
+		return err
+	}
+
+	// Make sure not to go past the maximum speed
+	if powerPct > 1.0 {
+		powerPct = 1.0
+	}
+	if powerPct < -1.0 {
+		powerPct = -1.0
+	}
+
+	targetRPM := powerPct * s.rpmLimits.max
+	if math.Abs(targetRPM) < s.rpmLimits.min {
+		return fmt.Errorf("refusing to set power to less than the minimum RPM (%f vs %f)",
+	                      targetRPM, s.rpmLimits.min)
+	}
+	targetRPS := targetRPM / 60.0 // Revolutions per second, not per minute!
+
+	// You might expect us to use DI to set the direction, JS to set the (unsigned) jogging speed,
+	// and then CJ to start continuous jogging. However, if you call SetPower again while we're
+	// already jogging, we need to use CS to set the new speed, which should be signed rather than
+	// using DI to change direction. This is much simpler if we just start jogging and then
+	// immediately set the (signed) velocity.
+	if _, err := s.comm.send(ctx, "CJ"); err != nil {
+		return err
+	}
+	if _, err := s.comm.send(ctx, fmt.Sprintf("CS%f", targetRPS)); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Stop implements motor.Motor.
