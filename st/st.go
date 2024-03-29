@@ -15,18 +15,20 @@ import (
 	"go.uber.org/multierr"
 	"go.viam.com/rdk/components/motor"
 	"go.viam.com/rdk/resource"
+
+	"viam-labs/viam-appliedmotion/common"
 )
 
 var Model = resource.NewModel("viam-labs", "appliedmotion", "st")
 
 type st struct {
 	resource.Named
-	mu           sync.RWMutex
-	logger       golog.Logger
-	cancelCtx    context.Context
-	cancelFunc   func()
-	comm         commPort
-	stepsPerRev  int64
+	mu          sync.RWMutex
+	logger      golog.Logger
+	cancelCtx   context.Context
+	cancelFunc  func()
+	comm        commPort
+	stepsPerRev int64
 
 	accelLimits limits
 	decelLimits limits
@@ -49,7 +51,7 @@ func init() {
 }
 
 func newMotor(ctx context.Context, deps resource.Dependencies, conf resource.Config, logger golog.Logger) (motor.Motor, error) {
-	logger.Info("Starting Applied Motion Products ST Motor Driver v0.1")
+	logger.Infof("Starting Applied Motion Products ST Motor Driver %s", common.Version)
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 
 	s := st{
@@ -247,7 +249,7 @@ func (s *st) Close(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return multierr.Combine(s.stopMovement(ctx),
-	                        s.comm.Close())
+		s.comm.Close())
 }
 
 func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
@@ -333,7 +335,7 @@ func (s *st) configuredMove(
 		return err
 	}
 	return multierr.Combine(s.waitForMoveCommandToComplete(ctx),
-	                        oldAcceleration.restore(ctx, s.comm))
+		oldAcceleration.restore(ctx, s.comm))
 }
 
 func (s *st) IsMoving(ctx context.Context) (bool, error) {
@@ -365,7 +367,7 @@ func (s *st) IsPowered(ctx context.Context, extra map[string]interface{}) (bool,
 	// The second return value is supposed to be the fraction of power sent to the motor, between 0
 	// (off) and 1 (maximum power). It's unclear how to implement this for a stepper motor, so we
 	// return 0 no matter what.
-	return (status[1] & 1 == 1), 0, err
+	return (status[1]&1 == 1), 0, err
 }
 
 // Position implements motor.Motor.
@@ -391,7 +393,7 @@ func (s *st) Position(ctx context.Context, extra map[string]interface{}) (float6
 			// We parsed the value as though it was unsigned, but it's really signed. We can't
 			// parse it as signed originally because strconv expects the sign to be indicated by a
 			// "-" at the beginning, not by the most significant bit in the word. Convert it here.
-			return float64(int32(val))/float64(s.stepsPerRev), nil
+			return float64(int32(val)) / float64(s.stepsPerRev), nil
 		}
 	}
 }
@@ -467,7 +469,7 @@ func (s *st) SetPower(ctx context.Context, powerPct float64, extra map[string]in
 	targetRPM := powerPct * s.rpmLimits.max
 	if math.Abs(targetRPM) < s.rpmLimits.min {
 		return fmt.Errorf("refusing to set power to less than the minimum RPM (%f vs %f)",
-	                      targetRPM, s.rpmLimits.min)
+			targetRPM, s.rpmLimits.min)
 	}
 	targetRPS := targetRPM / 60.0 // Revolutions per second, not per minute!
 
