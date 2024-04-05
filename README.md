@@ -24,7 +24,7 @@ Support has been explicity tested on the STF10-IP, and support for RS485 has bee
 
 ## Configuration
 | Variable | DataType | Inclusion | Notes |
-| -------- | -------- | ----- |
+| -------- | -------- | --------- | ----- |
 | protocol | string   | *Required* | The protocol to use for communicating with the controller. Acceptable values are `ip`, `rs485`, and `rs232` |
 | uri      | string   | *Required* | Either the IP address or the path to the `rs232`/`rs485` interface on linux |
 | steps_per_rev | int64 | *Required* | The number of pulses required to drive the motor one revolution. This is configured in the drive using the Applied Motion software |
