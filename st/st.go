@@ -289,6 +289,11 @@ func (s *st) GoTo(ctx context.Context, rpm float64, positionRevolutions float64,
 	return s.configuredMove(ctx, "FP", positionRevolutions, rpm, extra)
 }
 
+func (s *st) SetRPM(ctx context.Context, rpm float64, extra map[string]interface{}) error {
+	powerLevel := rpm / s.rpmLimits.max
+	return s.SetPower(ctx, powerLevel, extra)
+}
+
 func (s *st) configuredMove(
 	ctx context.Context,
 	command string,
