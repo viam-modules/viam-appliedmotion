@@ -2,8 +2,6 @@ module viam-labs/viam-appliedmotion
 
 go 1.21
 
-toolchain go1.21.10
-
 require (
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
