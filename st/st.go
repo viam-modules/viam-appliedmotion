@@ -253,14 +253,6 @@ func (s *st) Close(ctx context.Context) error {
 }
 
 func (s *st) GoFor(ctx context.Context, rpm float64, positionRevolutions float64, extra map[string]interface{}) error {
-	if positionRevolutions == 0 {
-		s.logger.Warn("Deprecated: setting revolutions == 0 will spin the motor indefinitely at the specified RPM")
-		// This is a special sentinel value to move forever.
-		powerLevel := rpm / s.rpmLimits.max
-		return s.SetPower(ctx, powerLevel, extra)
-	}
-
-	// Otherwise, do a normal GoFor.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.logger.Debugf("GoFor: rpm=%v, positionRevolutions=%v, extra=%v", rpm, positionRevolutions, extra)
