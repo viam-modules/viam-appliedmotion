@@ -16,10 +16,10 @@ import (
 	"go.viam.com/rdk/logging"
 	"go.viam.com/rdk/resource"
 
-	"viam-labs/viam-appliedmotion/common"
+	"viam/viam-appliedmotion/common"
 )
 
-var Model = resource.NewModel("viam-labs", "appliedmotion", "st")
+var Model = resource.NewModel("viam", "appliedmotion", "st")
 
 type st struct {
 	resource.Named
