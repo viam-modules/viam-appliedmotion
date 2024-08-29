@@ -1,4 +1,4 @@
-module viam-labs/viam-appliedmotion
+module viam/viam-appliedmotion
 
 go 1.21
 

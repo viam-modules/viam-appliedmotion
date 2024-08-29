@@ -1,12 +1,12 @@
 {
-  "module_id": "viam-labs:viam-appliedmotion",
+  "module_id": "viam:viam-appliedmotion",
   "visibility": "public",
-  "url": "https://github.com/viam-labs/viam-appliedmotion",
+  "url": "https://github.com/viam-modules/viam-appliedmotion",
   "description": "A modular component for Applied Motion Motor Controllers",
   "models": [
     {
       "api": "rdk:component:motor",
-      "model": "viam-labs:appliedmotion:st"
+      "model": "viam:appliedmotion:st"
     }
   ],
   "entrypoint": "viam-appliedmotion"
