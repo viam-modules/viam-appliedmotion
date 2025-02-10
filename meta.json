@@ -6,7 +6,9 @@
   "models": [
     {
       "api": "rdk:component:motor",
-      "model": "viam:appliedmotion:st"
+      "model": "viam:appliedmotion:st",
+      "markdown_link": "README.md#configure-your-appliedmotion-motor",
+      "short_description": "motor model for appliedmotion motors."
     }
   ],
   "entrypoint": "viam-appliedmotion"
