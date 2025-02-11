@@ -45,7 +45,7 @@ On the new component panel, copy and paste the following attribute template into
 Support Matrix:
 | Driver | Support |
 | ------ | ------- |
-| STF06-R | :warning: |
+| STF06-R | ⚠️ |
 | STF06-C | :no_entry_sign: |
 | STF06-D | :warning: |
 | STF06-IP | :warning: |
