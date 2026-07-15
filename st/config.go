@@ -26,28 +26,28 @@ type Config struct {
 }
 
 // Validate ensures all parts of the config are valid.
-func (conf *Config) Validate(path string) ([]string, error) {
+func (conf *Config) Validate(path string) ([]string, []string, error) {
 	if conf.Protocol == "" {
-		return nil, errors.New("protocol is required")
+		return nil, nil, errors.New("protocol is required")
 	}
 	if conf.Uri == "" {
-		return nil, errors.New("URI is required")
+		return nil, nil, errors.New("URI is required")
 	}
 	if conf.StepsPerRev <= 0 {
-		return nil, errors.New("steps_per_rev must be > 0")
+		return nil, nil, errors.New("steps_per_rev must be > 0")
 	}
 
 	// RPM checks
 	if conf.MaxRpm <= 0 {
-		return nil, errors.New("max_rpm must be > 0")
+		return nil, nil, errors.New("max_rpm must be > 0")
 	}
 
 	if conf.MinRpm < 0 {
-		return nil, errors.New("min_rpm must be >= 0")
+		return nil, nil, errors.New("min_rpm must be >= 0")
 	}
 
 	if conf.MaxRpm != 0 && conf.MaxRpm < conf.MinRpm {
-		return nil, errors.New("max_rpm must be >= min_rpm")
+		return nil, nil, errors.New("max_rpm must be >= min_rpm")
 	}
 
 	// Acceleration checks: start with a helper function
@@ -75,7 +75,7 @@ func (conf *Config) Validate(path string) ([]string, error) {
 		return nil
 	}
 
-	return nil, multierr.Combine(
+	return nil, nil, multierr.Combine(
 		checkLessThan(conf.MinAcceleration, conf.MaxAcceleration, "ac", "min_", "max_"),
 		checkLessThan(conf.MinAcceleration, conf.DefaultAcceleration, "ac", "min_", ""),
 		checkLessThan(conf.DefaultAcceleration, conf.MaxAcceleration, "ac", "default_", "max_"),
